@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Upload {
+  id        String   @id @default(cuid())
+  userId    String
+  fileName  String
+  blobName  String?
+  cepCount  Int
+  createdAt DateTime @default(now())
+}
+
+model CepGeocodeCache {
+  id        String   @id @default(cuid())
+  cep       String   @unique
+  lat       Float
+  lng       Float
+  address   String
+  bairro    String?
+  cidade    String?
+  uf        String?
+  source    String
+  cachedAt  DateTime @default(now())
+}
+
+model PlacesCache {
+  id          String   @id @default(cuid())
+  cacheKey    String   @unique
+  cep         String?
+  domain      String
+  searchType  String
+  resultsJson Json
+  cachedAt    DateTime @default(now())
+  expiresAt   DateTime
+}
+
+model DistanceCache {
+  id          String   @id @default(cuid())
+  originCep   String
+  destCep     String
+  distanceM   Float
+  durationS   Float?
+  source      String
+  cachedAt    DateTime @default(now())
+
+  @@unique([originCep, destCep])
+}
+
+model Analysis {
+  id              String   @id @default(cuid())
+  userId          String
+  uploadSessionId String?
+  businessUnitCep String
+  businessUnitCnpj String?
+  domain          String
+  reportJson      Json
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime?
+}
+
+model AnalysisHistory {
+  id               String   @id @default(cuid())
+  userId           String
+  createdAt        DateTime @default(now())
+  businessUnitCnpj String
+  businessUnitCep  String
+  businessUnitName String
+  businessUnitCnae String
+  domain           String
+  cepCount         Int
+  opportunityIndex Int
+  fullReportJson   Json
+}
+
+model SharedLink {
+  id         String   @id @default(cuid())
+  uuid       String   @unique
+  userId     String
+  analysisId String
+  reportJson Json
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+}
+
+model UserRateLimit {
+  id        String   @id @default(cuid())
+  userId    String
+  windowKey String
+  count     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, windowKey])
+}
+
+model CnpjCache {
+  id           String   @id @default(cuid())
+  cnpj         String   @unique
+  razaoSocial  String
+  nomeFantasia String?
+  cnaeCode     String
+  cnaeDesc     String
+  cep          String
+  logradouro   String
+  bairro       String
+  municipio    String
+  uf           String
+  rawJson      Json
+  cachedAt     DateTime @default(now())
+  expiresAt    DateTime
+}

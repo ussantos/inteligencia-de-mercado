@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.leaflet-container {
+  width: 100%;
+  min-height: 560px;
+  border-radius: 1.25rem;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
