@@ -3,10 +3,22 @@
 import { AlertTriangle, Star } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ExportButtons } from '@/components/ExportButtons';
-import { MarketMap } from '@/components/MarketMap';
+import dynamic from 'next/dynamic';
 import { Badge, Card } from '@/components/ui';
 import type { AnalysisResult } from '@/lib/types';
 import { formatKm } from '@/lib/utils';
+
+const MarketMap = dynamic(
+  () => import('@/components/MarketMap').then((mod) => mod.MarketMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-dashed bg-slate-50 text-sm text-slate-500">
+        Carregando mapa da região...
+      </div>
+    )
+  }
+);
 
 const sections = [
   ['fase', 'Fase do Mercado Local'],

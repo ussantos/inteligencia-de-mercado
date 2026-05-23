@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+﻿import { prisma } from '@/lib/prisma';
 import { haversineKm } from '@/lib/haversine';
 import {
   DEFAULT_COMPETITOR_TYPES,
@@ -61,9 +61,9 @@ function classifyByGoogleTypes(types: string[] | undefined, fallback: Competitor
     categoria,
     subcategoria: fallback.type,
     observacao: categoria === 'Concorrente direto de tecnologia'
-      ? 'Encontrado no Google Places como possível oferta concorrente ou substituta em tecnologia, programação, robótica, games ou maker.'
+      ? 'Encontrado no Google Places como possÃ­vel oferta concorrente ou substituta em tecnologia, programação, robótica, games ou maker.'
       : categoria === 'Polo gerador de público'
-        ? 'Local com potencial de concentração de famílias e oportunidade para ação local, parceria ou evento.'
+        ? 'Local com potencial de concentração de famÃ­lias e oportunidade para ação local, parceria ou evento.'
         : categoria === 'Barreira potencial de agenda'
           ? 'Pode competir com a agenda da criança ou indicar rotina escolar intensa. Validar com leads reais antes de alterar a oferta.'
           : 'Pode competir pelo tempo, atenção e orçamento familiar destinado a atividades extracurriculares.'
@@ -182,7 +182,7 @@ export async function getStrategicPlaces(input: {
     await prisma.placesCache.upsert({
       where: { cacheKey },
       update: { resultsJson: [], cachedAt: new Date(), expiresAt: new Date(Date.now() + TTL_30_DAYS) },
-      create: { cacheKey, cep: input.center.cep, domain: selectedCnaes.map((c) => c.descricao).join(', '), searchType: 'google-places-sem-chave', resultsJson: [], expiresAt: new Date(Date.now() + TTL_30_DAYS) }
+      create: { cacheKey, cep: input.center.cep, domain: selectedCnaes.map((cnae) => cnae.descricao).join(', '), searchType: 'google-places-sem-chave', resultsJson: [], expiresAt: new Date(Date.now() + TTL_30_DAYS) }
     });
     return [];
   }
@@ -227,7 +227,7 @@ export async function getStrategicPlaces(input: {
         rating,
         userRatingCount,
         confiabilidade: rating && userRatingCount && userRatingCount >= 5 ? 'Alta' : 'Média',
-        observacaoEstrategica: `${classification.observacao}${rating ? ` Avaliação Google: ${rating.toFixed(1)} (${userRatingCount || 0} avaliações).` : ' Avaliação Google não disponível.'}`
+        observacaoEstrategica: `${classification.observacao}${rating ? ` Avaliação Google: ${rating.toFixed(1)} (${userRatingCount || 0} avaliações).` : ' Avaliação Google não disponÃ­vel.'}`
       });
     }
   }
@@ -245,7 +245,7 @@ export async function getStrategicPlaces(input: {
     create: {
       cacheKey,
       cep: input.center.cep,
-      domain: selectedCnaes.map((cnae) => c.descricao).join(', '),
+      domain: selectedCnaes.map((cnae) => cnae.descricao).join(', '),
       searchType: `google-places:${typeKey}`,
       resultsJson: sorted as any,
       expiresAt: new Date(Date.now() + TTL_30_DAYS)
@@ -254,3 +254,8 @@ export async function getStrategicPlaces(input: {
 
   return sorted;
 }
+
+
+
+
+
