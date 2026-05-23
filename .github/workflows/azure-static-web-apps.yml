@@ -1,11 +1,15 @@
-name: Deploy Azure Static Web Apps - inteligencia
+﻿name: Deploy Azure Static Web Apps - inteligencia
 
 on:
   push:
     branches:
       - main
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     branches:
       - main
 
@@ -40,8 +44,7 @@ jobs:
           app_location: /
           api_location: ""
           output_location: ""
-          app_build_command: "npm run build"
-          build_timeout_in_minutes: 30
+          app_build_command: npm run build
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
