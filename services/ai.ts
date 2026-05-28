@@ -60,6 +60,12 @@ Para o campo "planoDeAcao", aja como consultor executivo e entregue recomendaç�
 - Se houver poucos dados do Google Places, deixe isso claro e proponha uma ação de validação manual.
 - Não invente nomes, números, avaliações ou bairros que não estejam nos dados.
 
+Para o campo "recomendacoesInteligentes", seja ainda mais sintético:
+- Escreva como se fosse uma orientação executiva para quem tem pouco tempo.
+- Não crie novas tarefas; transforme a análise em decisão, brecha e mensagem pronta.
+- A mensagem pronta deve poder ser usada em WhatsApp, anúncio local ou abordagem comercial sem edição pesada.
+- A objeção e a resposta devem ajudar atendimento/vendas a decidir o que falar primeiro.
+
 Responda APENAS JSON válido com os campos camelCase abaixo. Não invente dados estatísticos. Quando houver limitação, declare a limitação.
 
 {
@@ -77,6 +83,14 @@ Responda APENAS JSON válido com os campos camelCase abaixo. Não invente dados 
     "adicionar": [],
     "testarAntesDeAlterar": [],
     "fazerSemPrejudicarOperacao": []
+  },
+  "recomendacoesInteligentes": {
+    "prioridadePrincipal": "",
+    "brechaCompetitiva": "",
+    "personaFoco": "",
+    "objecaoProvavel": "",
+    "respostaRecomendada": "",
+    "mensagemPronta": ""
   },
   "planoDeAcao": [
     {

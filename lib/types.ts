@@ -169,6 +169,14 @@ export interface AnalysisResult {
     fazerSemPrejudicarOperacao: string[];
   };
   diagnosticoFontesPublicas: string[];
+  recomendacoesInteligentes: {
+    prioridadePrincipal: string;
+    brechaCompetitiva: string;
+    personaFoco: string;
+    objecaoProvavel: string;
+    respostaRecomendada: string;
+    mensagemPronta: string;
+  };
   planoDeAcao: Array<{
     prioridade: number;
     acao: string;

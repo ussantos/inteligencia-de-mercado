@@ -32,6 +32,7 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.strategicPlaces), 'Concorrentes e Obstáculos');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.perfilEconomico), 'Perfil Econômico');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.personas), 'Personas');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.recomendacoesInteligentes ? [result.recomendacoesInteligentes] : []), 'Recomendações IA');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.planoDeAcao), 'Plano de Ação');
     XLSX.writeFile(wb, 'analise-inteligencia-mercado.xlsx');
   }

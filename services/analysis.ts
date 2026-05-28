@@ -257,6 +257,34 @@ function buildPersonas(unidade: UnidadeNegocio, topBairro: string): Persona[] {
   ];
 }
 
+function buildSmartRecommendations(input: {
+  unitName: string;
+  topBairro: string;
+  strategicPlaces: StrategicPlace[];
+  directCount: number;
+  analysisRadiusKm: number;
+}) {
+  // Este resumo e propositalmente curto.
+  // Ele transforma os dados em decisao pratica, sem criar mais uma lista de tarefas para a pessoa.
+  const strongestCompetitor = input.strategicPlaces
+    .filter((place) => place.categoriaEstrategica.includes('Concorrente'))
+    .sort((a, b) => (b.userRatingCount || 0) - (a.userRatingCount || 0) || (b.rating || 0) - (a.rating || 0))[0];
+  const competitorHint = strongestCompetitor
+    ? `${strongestCompetitor.nome}${strongestCompetitor.rating ? `, avaliado com ${strongestCompetitor.rating.toFixed(1)} no Google` : ''}`
+    : 'os concorrentes locais ainda precisam ser validados manualmente';
+
+  return {
+    prioridadePrincipal: `Concentre a primeira rodada comercial em ${input.topBairro}, usando uma oferta clara e fácil de comparar.`,
+    brechaCompetitiva: input.directCount > 0
+      ? `Use conveniência, atendimento rápido e prova social local para competir contra ${competitorHint}.`
+      : `A baixa presença de concorrentes diretos no raio de ${input.analysisRadiusKm} km sugere espaço para testar presença local antes de ampliar investimento.`,
+    personaFoco: `Priorize decisores que valorizam solução próxima, resposta rápida e segurança antes de comparar apenas preço.`,
+    objecaoProvavel: 'A objeção mais provável é comparar preço ou reputação com alternativas já conhecidas.',
+    respostaRecomendada: 'Responda mostrando diferencial concreto, prazo, facilidade de atendimento, prova social e próximo passo simples.',
+    mensagemPronta: `Olá! A ${input.unitName} atende sua região com foco em solução prática, orientação clara e resposta rápida. Posso te mostrar a melhor opção para o que você precisa hoje?`
+  };
+}
+
 export async function runMarketAnalysis(input: {
   userId: string;
   unidade: UnidadeNegocio;
@@ -400,6 +428,7 @@ export async function runMarketAnalysis(input: {
       'PNAD Contínua é amostral e normalmente não oferece granularidade por bairro/CEP.',
       'Censo 2022 pode enriquecer a análise, mas exige ETL com setor censitário, malha territorial e cruzamento geográfico.'
     ],
+    recomendacoesInteligentes: buildSmartRecommendations({ unitName, topBairro, strategicPlaces, directCount, analysisRadiusKm }),
     planoDeAcao: [
       { prioridade: 1, acao: `Priorizar os bairros com maior afinidade dentro de ${analysisRadiusKm} km para campanhas e follow-up ativo.`, tipo: 'Testar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '7 a 14 dias', custoEstimado: 'Baixo', recursoGratuitoConfirmado: false, responsavelSugerido: 'Comercial/Marketing', kpiParaMedirSucesso: 'Leads qualificados por bairro' },
       { prioridade: 2, acao: 'Criar argumento comercial comparando a empresa com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },

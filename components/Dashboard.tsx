@@ -2,7 +2,7 @@
 
 // Este componente mostra o relatorio final.
 // Ele pega o resultado calculado pelo servidor e transforma em secoes, graficos, listas, mapa e botoes de exportacao.
-import { AlertTriangle, Star } from 'lucide-react';
+import { AlertTriangle, MessageSquareText, Sparkles, Star } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ExportButtons } from '@/components/ExportButtons';
 import dynamic from 'next/dynamic';
@@ -27,6 +27,7 @@ const MarketMap = dynamic(
 const sections = [
   ['fase', 'Fase do Mercado Local'],
   ['contexto', 'Contexto da Região'],
+  ['recomendacoes', 'Recomendações Inteligentes'],
   ['mapa', 'Mapa com camadas'],
   ['estatisticas', 'Painel de Estatísticas'],
   ['distancias', 'Análise de Distâncias'],
@@ -55,6 +56,14 @@ export function Dashboard({ result, readOnly = false }: { result: AnalysisResult
   const direct = result.strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente direto' || p.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
   const indirect = result.strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente indireto' || p.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
   const position = result.posicionamentoUnidade;
+  const smartRecommendations = result.recomendacoesInteligentes || {
+    prioridadePrincipal: 'Priorize os bairros com maior afinidade e valide a resposta comercial antes de ampliar investimento.',
+    brechaCompetitiva: 'Use conveniência, clareza de oferta e prova social local para se diferenciar de alternativas próximas.',
+    personaFoco: 'Foque decisores que precisam de confiança, resposta rápida e comparação simples entre opções.',
+    objecaoProvavel: 'A objeção mais provável é comparação de preço, reputação ou conveniência.',
+    respostaRecomendada: 'Responda com diferencial concreto, prazo, prova social e próximo passo simples.',
+    mensagemPronta: `Olá! A ${unitName} atende sua região com orientação clara e resposta rápida. Posso te mostrar a melhor opção para o que você precisa hoje?`
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -71,6 +80,8 @@ export function Dashboard({ result, readOnly = false }: { result: AnalysisResult
         <section id="fase"><Card><Badge className={faseColor}>{result.faseMercadoLocal.fase}</Badge><h2 className="mt-3 text-3xl font-bold text-slate-900">Inteligência de Mercado — {unitName}</h2><p className="mt-2 text-slate-600">{result.faseMercadoLocal.justificativa}</p><p className="mt-2 text-sm text-slate-500"><strong>Raio analisado:</strong> {result.analysisRadiusKm} km</p><p className="mt-2 text-sm text-slate-500"><strong>CNAEs analisados:</strong> {result.selectedCnaes.map((cnae) => cnae.descricao).join(' · ')}</p><p className="mt-2 text-sm text-slate-500"><strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}</p>{result.iaAviso && <p className="mt-4 rounded-2xl bg-blue-50 p-3 text-sm text-blue-800">{result.iaAviso}</p>}</Card></section>
 
         <section id="contexto"><Card><h2 className="text-2xl font-bold text-slate-900">Contexto da Região</h2><div className="mt-4 grid gap-4 md:grid-cols-4"><Metric label="CEPs de clientes" value={result.estatisticas.totalValidos} /><Metric label="Bairros/regiões" value={result.estatisticas.topBairros.length} /><Metric label="Concorrentes diretos" value={direct} /><Metric label="Índice de oportunidade" value={`${result.estatisticas.indiceOportunidadeMercado}/100`} /></div></Card></section>
+
+        <section id="recomendacoes"><Card><div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-orange-500" /><h2 className="text-2xl font-bold text-slate-900">Recomendações Inteligentes</h2></div><p className="mt-2 text-sm text-slate-500">Síntese para decidir rápido: prioridade, brecha competitiva, persona foco, objeção provável e uma mensagem pronta para usar.</p><div className="mt-5 grid gap-4 md:grid-cols-2"><SmartCard title="Prioridade principal" text={smartRecommendations.prioridadePrincipal} /><SmartCard title="Brecha competitiva" text={smartRecommendations.brechaCompetitiva} /><SmartCard title="Persona foco" text={smartRecommendations.personaFoco} /><SmartCard title="Objeção provável" text={smartRecommendations.objecaoProvavel} /><SmartCard title="Resposta recomendada" text={smartRecommendations.respostaRecomendada} /><div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 md:col-span-2"><div className="flex items-center gap-2 text-sm font-bold text-orange-800"><MessageSquareText className="h-4 w-4" />Mensagem pronta</div><p className="mt-3 text-sm leading-6 text-slate-800">{smartRecommendations.mensagemPronta}</p></div></div></Card></section>
 
         <section id="mapa"><Card><h2 className="text-2xl font-bold text-slate-900">Mapa com camadas</h2><p className="mt-2 text-sm text-slate-500">Mapa OpenStreetMap para visualização. Concorrentes e avaliações vêm do Google Places quando a chave está configurada.</p><div className="mt-5"><MarketMap result={result} /></div></Card></section>
 
@@ -97,5 +108,6 @@ export function Dashboard({ result, readOnly = false }: { result: AnalysisResult
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) { return <div className="rounded-2xl bg-slate-50 p-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>; }
+function SmartCard({ title, text }: { title: string; text: string }) { return <div className="rounded-2xl border border-slate-200 p-4"><p className="text-sm font-bold text-slate-900">{title}</p><p className="mt-2 text-sm leading-6 text-slate-700">{text}</p></div>; }
 function Ranking({ title, items }: { title: string; items: AnalysisResult['afinidadePorBairro'] }) { return <Card><h2 className="text-2xl font-bold text-slate-900">{title}</h2><div className="mt-5 space-y-3">{items.slice(0, 10).map((item, index) => <div key={`${item.bairro}-${item.cidade}`} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center justify-between"><div><p className="font-bold text-slate-900">{index + 1}. {item.bairro}, {item.cidade}</p><p className="text-sm text-slate-500">{item.cepCount} CEP(s) · distância média {formatKm(item.distanciaMediaKm)}</p></div><Badge className="bg-emerald-100 text-emerald-700">{item.score}/100</Badge></div><ul className="mt-2 list-disc pl-5 text-sm text-slate-600">{item.evidencias.slice(0, 3).map((ev) => <li key={ev}>{ev}</li>)}</ul><p className="mt-2 text-sm font-semibold text-slate-700">{item.acaoRecomendada}</p></div>)}</div></Card>; }
 function GridLists({ data }: { data: Record<string, readonly string[]> }) { return <div className="mt-5 grid gap-4 md:grid-cols-2">{Object.entries(data).map(([key, values]) => <div key={key} className="rounded-2xl border border-slate-200 p-4"><h3 className="font-bold capitalize text-slate-900">{key.replace(/([A-Z])/g, ' $1').replaceAll('_', ' ')}</h3><ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">{values.map((value) => <li key={value}>{value}</li>)}</ul></div>)}</div>; }
