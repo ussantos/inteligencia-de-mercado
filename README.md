@@ -83,7 +83,7 @@ O build executa:
 prisma generate && next build && node scripts/prepare-standalone.js
 ```
 
-O `staticwebapp.config.json` define headers de seguranca, noindex, redirect de 401 para `/sign-in` e runtime `node:22`. O `next.config.js` usa `output: 'standalone'`, e o script `scripts/prepare-standalone.js` copia os arquivos estaticos necessarios para dentro do pacote gerado pelo Next.
+O `staticwebapp.config.json` define headers de seguranca, noindex, redirect de 401 para `/sign-in` e runtime `node:22`. O `next.config.js` usa `output: 'standalone'`, e o script `scripts/prepare-standalone.js` copia os arquivos estaticos e o cliente Prisma necessario para dentro do pacote gerado pelo Next.
 
 Existe apenas um workflow ativo para deploy:
 
@@ -234,6 +234,14 @@ Isso e esperado. A rota principal `/` e protegida pelo Clerk.
 ### Erro de Prisma no build
 
 Confirme que o build executa `prisma generate && next build && node scripts/prepare-standalone.js` e que `DATABASE_URL` esta configurada no GitHub Actions/Azure.
+
+### Erro de Prisma em producao por OpenSSL
+
+Se aparecer mensagem dizendo que o Prisma foi gerado para `debian-openssl-1.1.x`, mas o Azure precisa de `debian-openssl-3.0.x`, confirme:
+
+- `prisma/schema.prisma` possui `binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]`.
+- O deploy rodou depois dessa alteracao.
+- `scripts/prepare-standalone.js` copiou `node_modules/.prisma` e `node_modules/@prisma/client` para `.next/standalone/node_modules`.
 
 ### Falha ao publicar Azure Functions
 

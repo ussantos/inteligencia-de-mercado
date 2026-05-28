@@ -1,6 +1,7 @@
 // Este arquivo calcula distancias.
 // Sempre temos a distancia em linha reta; quando existe chave do OpenRouteService, tambem tentamos distancia de carro.
 import { prisma } from '@/lib/prisma';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { haversineKm } from '@/lib/haversine';
 
 export async function getDistance(origin: { cep: string; lat: number; lng: number }, dest: { cep: string; lat: number; lng: number }) {
@@ -34,7 +35,7 @@ export async function getDistance(origin: { cep: string; lat: number; lng: numbe
   }
 
   try {
-    const response = await fetch('https://api.openrouteservice.org/v2/matrix/driving-car', {
+    const response = await fetchWithTimeout('https://api.openrouteservice.org/v2/matrix/driving-car', {
       method: 'POST',
       headers: {
         Authorization: orsKey,
@@ -47,7 +48,7 @@ export async function getDistance(origin: { cep: string; lat: number; lng: numbe
         ],
         metrics: ['distance', 'duration']
       })
-    });
+    }, 15000);
 
     if (!response.ok) throw new Error('ORS indisponível');
     const json = await response.json();

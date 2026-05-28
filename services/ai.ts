@@ -1,5 +1,6 @@
 // Este arquivo faz o complemento opcional com OpenAI.
 // Se nao houver OPENAI_API_KEY, a aplicacao continua funcionando com as regras locais.
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import type { AnalysisResult } from '@/lib/types';
 
 function extractJson(text: string) {
@@ -84,7 +85,7 @@ ${JSON.stringify(payload, null, 2)}
 `;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -98,7 +99,7 @@ ${JSON.stringify(payload, null, 2)}
           { role: 'user', content: prompt }
         ]
       })
-    });
+    }, 30000);
 
     if (!response.ok) return null;
     const json = await response.json();

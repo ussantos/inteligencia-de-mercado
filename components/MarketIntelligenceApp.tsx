@@ -221,8 +221,8 @@ export function MarketIntelligenceApp() {
         {!result ? (
           <section className="space-y-6">
             <Card>
-              <Badge className="bg-slate-100 text-slate-600">1 — Unidade do negócio</Badge>
-              <h2 className="mt-4 text-2xl font-bold text-slate-900">Informe o CNPJ da unidade</h2>
+              <Badge className="bg-slate-100 text-slate-600">1 — Dados do negócio</Badge>
+              <h2 className="mt-4 text-2xl font-bold text-slate-900">Informe o CNPJ do negócio</h2>
               <p className="mt-2 text-sm text-slate-500">O sistema consulta bases públicas, identifica endereço, CEP e CNAEs, e usa esses dados para orientar a busca de concorrentes na região.</p>
               <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
                 <Input value={cnpj} onChange={(event) => setCnpj(event.target.value)} placeholder="CNPJ — ex: 12.345.678/0001-90" />
@@ -264,9 +264,9 @@ export function MarketIntelligenceApp() {
             <Card>
               <Badge className="bg-slate-100 text-slate-600">4 — Região e clientes atuais</Badge>
               <h2 className="mt-4 text-xl font-bold text-slate-900">Defina o raio de análise e, opcionalmente, envie CEPs de clientes</h2>
-              <p className="mt-2 text-sm text-slate-500">O upload de CEPs é opcional e serve para demonstrar onde estão os clientes atuais do negócio. Mesmo sem planilha, a ferramenta analisa a região de atuação da unidade a partir do raio informado.</p>
+              <p className="mt-2 text-sm text-slate-500">O upload de CEPs é opcional e serve para demonstrar onde estão os clientes atuais do negócio. Mesmo sem planilha, a ferramenta analisa a região de atuação do empreendimento a partir do raio informado.</p>
               <div className="mt-5 max-w-xs">
-                <label className="text-sm font-semibold text-slate-700">Raio de análise em torno da unidade</label>
+                <label className="text-sm font-semibold text-slate-700">Raio de análise em torno do negócio</label>
                 <Input type="number" min={1} max={50} value={analysisRadiusKm} onChange={(event) => setAnalysisRadiusKm(Number(event.target.value || 8))} />
                 <p className="mt-1 text-xs text-slate-500">Padrão: 8 km. Limite operacional: 1 a 50 km.</p>
               </div>

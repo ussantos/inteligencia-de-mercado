@@ -1,6 +1,7 @@
 // Este arquivo e um caminho legado usando OpenStreetMap/Overpass.
 // Hoje a aplicacao principal usa Google Places, mas este codigo ajuda como referencia ou fallback futuro.
 import { prisma } from '@/lib/prisma';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { haversineKm } from '@/lib/haversine';
 import { DEFAULT_COMPETITOR_TYPE, getConfigsForCompetitorType, type CompetitorType, type CompetitorTypeConfig } from '@/lib/competitor-types';
 import type { CategoriaEstrategica, StrategicPlace, UnidadeNegocio } from '@/lib/types';
@@ -162,13 +163,13 @@ export async function getStrategicPlaces(input: {
 
   const configs = getConfigsForCompetitorType(competitorType);
   const query = buildOverpassQuery(input.center.lat, input.center.lng, radiusM, competitorType);
-  const response = await fetch('https://overpass-api.de/api/interpreter', {
+  const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: new URLSearchParams({ data: query })
-  });
+  }, 50000).catch(() => null);
 
-  if (!response.ok) return [];
+  if (!response || !response.ok) return [];
   const json = await response.json();
   const ownNames = [input.unidade.razaoSocial, input.unidade.nomeFantasia].filter(Boolean).map((x) => normalizeText(String(x)));
   const seen = new Set<string>();

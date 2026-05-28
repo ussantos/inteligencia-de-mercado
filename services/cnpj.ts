@@ -3,6 +3,7 @@
 // O resultado e normalizado para a aplicacao sempre receber o mesmo formato.
 import { prisma } from '@/lib/prisma';
 import { normalizeCnpj, validarCNPJ } from '@/lib/cnpj';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import type { CnaeOption, UnidadeNegocio } from '@/lib/types';
 
 function normalizeText(value: unknown): string | null {
@@ -130,7 +131,9 @@ function mapOpenCnpj(data: any, cnpj: string): UnidadeNegocio {
 }
 
 async function fetchJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, { ...init, headers: { Accept: 'application/json', ...(init?.headers || {}) } });
+  // Cada fonte publica recebe um tempo limite curto.
+  // Se ela falhar, tentamos a proxima fonte em vez de travar a tela do usuario.
+  const response = await fetchWithTimeout(url, { ...init, headers: { Accept: 'application/json', ...(init?.headers || {}) } }, 12000);
   if (!response.ok) throw new Error(`Fonte retornou HTTP ${response.status}`);
   return response.json();
 }

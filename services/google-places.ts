@@ -2,6 +2,7 @@
 // Ele procura locais relevantes perto do negocio e transforma a resposta do Google no formato usado pelo relatorio.
 // A chave fica no servidor para nao ser exposta no navegador.
 import { prisma } from '@/lib/prisma';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { haversineKm } from '@/lib/haversine';
 import {
   DEFAULT_COMPETITOR_TYPES,
@@ -93,46 +94,51 @@ async function googleTextSearch(params: {
   const key = apiKey();
   if (!key) return [];
 
-  const response = await fetch(GOOGLE_TEXT_SEARCH_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': key,
-      'X-Goog-FieldMask': [
-        'places.id',
-        'places.displayName',
-        'places.formattedAddress',
-        'places.location',
-        'places.rating',
-        'places.userRatingCount',
-        'places.websiteUri',
-        'places.nationalPhoneNumber',
-        'places.regularOpeningHours',
-        'places.types'
-      ].join(',')
-    },
-    body: JSON.stringify({
-      textQuery: params.query,
-      languageCode: 'pt-BR',
-      regionCode: 'BR',
-      maxResultCount: 20,
-      locationBias: {
-        circle: {
-          center: { latitude: params.lat, longitude: params.lng },
-          radius: params.radiusM
+  try {
+    const response = await fetchWithTimeout(GOOGLE_TEXT_SEARCH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': key,
+        'X-Goog-FieldMask': [
+          'places.id',
+          'places.displayName',
+          'places.formattedAddress',
+          'places.location',
+          'places.rating',
+          'places.userRatingCount',
+          'places.websiteUri',
+          'places.nationalPhoneNumber',
+          'places.regularOpeningHours',
+          'places.types'
+        ].join(',')
+      },
+      body: JSON.stringify({
+        textQuery: params.query,
+        languageCode: 'pt-BR',
+        regionCode: 'BR',
+        maxResultCount: 20,
+        locationBias: {
+          circle: {
+            center: { latitude: params.lat, longitude: params.lng },
+            radius: params.radiusM
+          }
         }
-      }
-    })
-  });
+      })
+    }, 15000);
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    console.warn(`Google Places retornou HTTP ${response.status} para "${params.query}". ${text}`);
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      console.warn(`Google Places retornou HTTP ${response.status} para "${params.query}". ${text}`);
+      return [];
+    }
+
+    const json = (await response.json()) as GoogleSearchResponse;
+    return Array.isArray(json.places) ? json.places : [];
+  } catch (error) {
+    console.warn(`Google Places falhou para "${params.query}". ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     return [];
   }
-
-  const json = (await response.json()) as GoogleSearchResponse;
-  return Array.isArray(json.places) ? json.places : [];
 }
 
 function buildSearchJobs(input: {
@@ -245,7 +251,7 @@ export async function getStrategicPlaces(input: {
         rating,
         userRatingCount,
         confiabilidade: rating && userRatingCount && userRatingCount >= 5 ? 'Alta' : 'Média',
-        observacaoEstrategica: `${classification.observacao}${rating ? ` Avaliação Google: ${rating.toFixed(1)} (${userRatingCount || 0} avaliações).` : ' Avaliação Google não disponÃ­vel.'}`
+        observacaoEstrategica: `${classification.observacao}${rating ? ` Avaliação Google: ${rating.toFixed(1)} (${userRatingCount || 0} avaliações).` : ' Avaliação Google não disponível.'}`
       });
     }
   }

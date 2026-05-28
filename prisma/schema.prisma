@@ -1,7 +1,10 @@
 // Este arquivo descreve as tabelas do banco de dados.
 // Prisma le este schema e gera um cliente TypeScript para salvar e buscar dados com seguranca.
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // O Azure Static Web Apps pode gerar o Prisma em uma imagem Linux e executar em outra.
+  // Por isso geramos os engines dos dois OpenSSLs usados no deploy, evitando erro de runtime.
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {

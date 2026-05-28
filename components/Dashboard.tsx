@@ -34,7 +34,7 @@ const sections = [
   ['afinidade', 'Índice de Afinidade por Bairro'],
   ['obstaculos', 'Obstáculos de Matrícula'],
   ['concorrentes', 'Concorrentes e Locais'],
-  ['posicionamento', 'Posicionamento da Unidade'],
+  ['posicionamento', 'Posicionamento do Negócio'],
   ['personas', 'Personas'],
   ['evolucao', 'Evolução Incremental'],
   ['fontes', 'Diagnóstico das Fontes'],
@@ -76,7 +76,7 @@ export function Dashboard({ result, readOnly = false }: { result: AnalysisResult
 
         <section id="estatisticas"><Card><h2 className="text-2xl font-bold text-slate-900">Painel de Estatísticas</h2><div className="mt-5 grid gap-6 lg:grid-cols-2"><div className="h-72"><ResponsiveContainer><BarChart data={result.estatisticas.distribuicaoDistancias}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="faixa" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="total" radius={[8,8,0,0]} /></BarChart></ResponsiveContainer></div><div className="h-72"><ResponsiveContainer><PieChart><Pie data={result.estatisticas.topBairros} dataKey="total" nameKey="bairro" outerRadius={95} label>{result.estatisticas.topBairros.map((_, index) => <Cell key={index} />)}</Pie></PieChart></ResponsiveContainer></div></div></Card></section>
 
-        <section id="distancias"><Card><h2 className="text-2xl font-bold text-slate-900">Análise de Distâncias</h2>{result.points.length ? <div className="mt-4 grid gap-4 md:grid-cols-2"><Metric label="Distância média dos clientes" value={formatKm(result.estatisticas.distanciaMediaKm)} /><Metric label="Distância mediana dos clientes" value={formatKm(result.estatisticas.distanciaMedianaKm)} /></div> : <p className="mt-3 text-sm text-slate-600">Nenhuma planilha de CEPs foi enviada. A análise usa o raio de atuação em torno da unidade e os locais encontrados no Google Places.</p>}</Card></section>
+        <section id="distancias"><Card><h2 className="text-2xl font-bold text-slate-900">Análise de Distâncias</h2>{result.points.length ? <div className="mt-4 grid gap-4 md:grid-cols-2"><Metric label="Distância média dos clientes" value={formatKm(result.estatisticas.distanciaMediaKm)} /><Metric label="Distância mediana dos clientes" value={formatKm(result.estatisticas.distanciaMedianaKm)} /></div> : <p className="mt-3 text-sm text-slate-600">Nenhuma planilha de CEPs foi enviada. A análise usa o raio de atuação em torno do negócio e os locais encontrados no Google Places.</p>}</Card></section>
 
         <section id="economico"><Ranking title="Perfil Econômico e Financeiro" items={result.perfilEconomico} /></section>
         <section id="afinidade"><Ranking title="Índice de Afinidade por Bairro" items={result.afinidadePorBairro} /></section>

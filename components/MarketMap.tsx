@@ -36,8 +36,8 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
     <MapContainer center={center} zoom={12} scrollWheelZoom className="z-0">
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <LayersControl position="topright">
-        <LayersControl.Overlay checked name="Sua Unidade">
-          <Marker position={center} icon={unitIcon}><Popup><strong>Sua Unidade</strong><br />{result.unidade.nomeFantasia || result.unidade.razaoSocial}<br />{result.unidadeGeo.endereco}</Popup></Marker>
+        <LayersControl.Overlay checked name="Seu negócio">
+          <Marker position={center} icon={unitIcon}><Popup><strong>Seu negócio</strong><br />{result.unidade.nomeFantasia || result.unidade.razaoSocial}<br />{result.unidadeGeo.endereco}</Popup></Marker>
         </LayersControl.Overlay>
         <LayersControl.Overlay checked name="Alfinetes Individuais">
           <>{result.points.map((point) => <CircleMarker key={point.cep} center={[point.lat, point.lng]} radius={7}><Popup><strong>CEP {formatCep(point.cep)}</strong><br />{point.bairro}, {point.cidade}/{point.uf}<br />Distância: {formatKm(point.distanciaLinhaRetaKm)}</Popup></CircleMarker>)}</>

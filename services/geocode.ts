@@ -2,6 +2,7 @@
 // Primeiro pegamos o endereco pelo ViaCEP, depois usamos LocationIQ ou Nominatim para achar o ponto no mapa.
 import { prisma } from '@/lib/prisma';
 import { normalizeCep } from '@/lib/cep';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { getViaCep } from '@/services/viacep';
 
 export interface GeoResult {
@@ -67,7 +68,7 @@ export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
 
   if (locationIqUrl) {
     try {
-      const response = await fetch(locationIqUrl);
+      const response = await fetchWithTimeout(locationIqUrl, {}, 10000);
       if (response.ok) {
         const json = (await response.json()) as Array<{ lat: string; lon: string }>;
         if (json[0]) {
@@ -83,17 +84,21 @@ export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
 
   if (lat == null || lng == null) {
     await waitNominatimSlot();
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=br`;
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'inteligencia-de-mercado/1.0' }
-    });
-    if (response.ok) {
-      const json = (await response.json()) as Array<{ lat: string; lon: string }>;
-      if (json[0]) {
-        lat = Number(json[0].lat);
-        lng = Number(json[0].lon);
-        source = 'Nominatim';
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=br`;
+      const response = await fetchWithTimeout(url, {
+        headers: { 'User-Agent': 'inteligencia-de-mercado/1.0' }
+      }, 12000);
+      if (response.ok) {
+        const json = (await response.json()) as Array<{ lat: string; lon: string }>;
+        if (json[0]) {
+          lat = Number(json[0].lat);
+          lng = Number(json[0].lon);
+          source = 'Nominatim';
+        }
       }
+    } catch {
+      // Se o geocodificador publico falhar, retornamos null para a analise explicar a falta de coordenadas.
     }
   }
 
