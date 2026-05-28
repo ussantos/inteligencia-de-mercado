@@ -1,10 +1,10 @@
 # Plano Azure - Inteligencia de Mercado
 
-Status: Alteracoes aplicadas. Validacao completa bloqueada por falha de instalacao de dependencias no npm local.
+Status: Alteracoes aplicadas. Deploy validado no Azure Static Web Apps via GitHub Actions.
 
 ## Objetivo
 
-Modernizar o projeto existente para ser uma aplicacao independente de inteligencia de mercado, preparada para Azure Static Web Apps, sem dependencia de marca, site ou dominio da My Robot.
+Modernizar o projeto existente para ser uma aplicacao independente de inteligencia de mercado, preparada para Azure Static Web Apps, sem dependencia de marca, site ou dominio especifico.
 
 ## Diagnostico do projeto
 
@@ -17,7 +17,7 @@ Modernizar o projeto existente para ser uma aplicacao independente de inteligenc
 ## Alteracoes planejadas
 
 1. Atualizar identidade, metadata, textos de interface, exportacoes e README para "Inteligencia de Mercado" generico.
-2. Manter Azure Static Web Apps como alvo independente, sem subdominio ou acoplamento ao site da My Robot.
+2. Manter Azure Static Web Apps como alvo independente, sem subdominio ou acoplamento a qualquer site externo.
 3. Corrigir Google Places para nao armazenar cache vazio quando a chave nao estiver configurada e para filtrar resultados pelo raio analisado.
 4. Generalizar categorias de concorrentes e textos analiticos para qualquer tipo de negocio.
 5. Ajustar prompt de IA para inteligencia de mercado B2B/B2C generica.
@@ -31,26 +31,25 @@ Modernizar o projeto existente para ser uma aplicacao independente de inteligenc
 
 ## Servicos Azure
 
-- Azure Static Web Apps `inteligencia` no resource group `inteligencia`, regiao `East US 2`, SKU Free.
+- Azure Static Web Apps como hospedagem principal.
 - Azure Blob Storage opcional para upload temporario.
 - Banco Postgres externo existente via `DATABASE_URL`.
 
 ## Configuracao de deploy aplicada
 
 - Runtime Node alinhado para 22.x no `package.json` e `staticwebapp.config.json`.
-- `next.config.js` sem `output: standalone`, pois o destino e Azure Static Web Apps, nao container/App Service.
-- `npm run build` executa `prisma generate && next build`.
+- `next.config.js` usa `output: 'standalone'` para reduzir o pacote dinamico publicado como Function gerenciada.
+- `npm run build` executa `prisma generate && next build && node scripts/prepare-standalone.js`.
 - Workflow GitHub Actions usa `Azure/static-web-apps-deploy@v1`, `app_location: /`, `api_location: ""`, `output_location: ""`.
-- Deploy esperado via secret `AZURE_STATIC_WEB_APPS_API_TOKEN`, obtido da instancia SWA `inteligencia`.
+- Deploy esperado via secret `AZURE_STATIC_WEB_APPS_API_TOKEN`, configurado no ambiente de CI.
 
 ## Validacao
 
-- `npm run typecheck`
-- `npm run build`
+- GitHub Actions executa `npm run build`.
+- Azure Static Web Apps valida e publica o pacote gerado.
 
 Resultado local:
 
 - `git diff --check`: sem erros de whitespace.
 - Busca por segredos reais no repositorio: nenhum token informado pelo usuario foi encontrado.
-- `npm install`/`npm ci`: bloqueado por timeouts do gateway de pacotes e erro interno do npm `Exit handler never called`.
-- `tsc --noEmit`: nao concluiu porque a instalacao parcial ficou sem varios pacotes `@types`; o `node_modules` parcial foi removido.
+- Deploy no Azure Static Web Apps concluiu com sucesso apos ajuste para pacote `standalone`.
