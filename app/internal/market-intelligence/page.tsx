@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { MarketIntelligenceApp } from '@/components/MarketIntelligenceApp';
+import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
   title: 'Inteligência de Mercado',
@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function MarketIntelligencePage() {
-  return <MarketIntelligenceApp />;
+  redirect('/');
 }

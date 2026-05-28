@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { MarketIntelligenceApp } from '@/components/MarketIntelligenceApp';
 
 export default function HomePage() {
-  redirect('/internal/market-intelligence');
+  return <MarketIntelligenceApp />;
 }
