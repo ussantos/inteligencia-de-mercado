@@ -11,7 +11,7 @@ Modernizar o projeto existente para ser uma aplicacao independente de inteligenc
 - Aplicacao Next.js 15 com App Router, rotas API, Clerk, Prisma, Neon/Postgres, Azure Blob Storage e Leaflet.
 - Ja existe `staticwebapp.config.json` com runtime Node 22 para APIs.
 - A busca de concorrentes usa `services/google-places.ts`, mas existe codigo legado de Overpass.
-- O README e textos do produto ainda citam My Robot, robotica, tecnologia infantil e dominio `myrobotbarra.com.br`.
+- O README e textos do produto tinham acoplamento a marca, segmento e dominio especificos.
 - Provavel causa da falha atual de concorrentes: quando nao ha chave Google, o servico grava cache vazio por 30 dias e reutiliza esse resultado mesmo depois que a chave e configurada.
 
 ## Alteracoes planejadas
@@ -31,9 +31,17 @@ Modernizar o projeto existente para ser uma aplicacao independente de inteligenc
 
 ## Servicos Azure
 
-- Azure Static Web Apps para hospedagem do Next.js.
+- Azure Static Web Apps `inteligencia` no resource group `inteligencia`, regiao `East US 2`, SKU Free.
 - Azure Blob Storage opcional para upload temporario.
 - Banco Postgres externo existente via `DATABASE_URL`.
+
+## Configuracao de deploy aplicada
+
+- Runtime Node alinhado para 22.x no `package.json` e `staticwebapp.config.json`.
+- `next.config.js` sem `output: standalone`, pois o destino e Azure Static Web Apps, nao container/App Service.
+- `npm run build` executa `prisma generate && next build`.
+- Workflow GitHub Actions usa `Azure/static-web-apps-deploy@v1`, `app_location: /`, `api_location: ""`, `output_location: ""`.
+- Deploy esperado via secret `AZURE_STATIC_WEB_APPS_API_TOKEN`, obtido da instancia SWA `inteligencia`.
 
 ## Validacao
 

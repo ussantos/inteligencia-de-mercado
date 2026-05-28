@@ -2,9 +2,12 @@
   "name": "inteligencia-de-mercado",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",

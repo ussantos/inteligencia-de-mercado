@@ -1,4 +1,4 @@
-﻿name: Deploy Azure Static Web Apps - inteligencia-de-mercado
+﻿name: Deploy Azure Static Web Apps - inteligencia
 
 on:
   push:
@@ -26,6 +26,7 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}

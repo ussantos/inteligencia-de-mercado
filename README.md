@@ -2,7 +2,7 @@
 
 Aplicacao independente para analise regional de concorrencia, oportunidades, barreiras comerciais e posicionamento para qualquer tipo de negocio.
 
-O projeto foi preparado para rodar como um **Azure Static Web App** proprio, sem dependencia de qualquer site ou dominio externo especifico.
+O projeto foi preparado para rodar como um **Azure Static Web App** proprio, sem dependencia de qualquer site ou dominio externo especifico. A instancia de destino atual e o recurso Azure `inteligencia`.
 
 ## Proposito
 
@@ -65,6 +65,7 @@ Veja `.env.example`. Nunca commite `.env`, `.env.local`, tokens, connection stri
 Principais variaveis:
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
 - `CLERK_SECRET_KEY`
 - `DATABASE_URL`
 - `AZURE_STORAGE_CONNECTION_STRING`
@@ -76,6 +77,16 @@ Principais variaveis:
 - `OPENAI_MODEL`
 
 ## Deploy no Azure Static Web Apps
+
+Instancia Azure atual:
+
+```text
+Resource name: inteligencia
+Resource group: inteligencia
+Region: East US 2
+SKU: Free
+Default hostname: gray-glacier-0dc52610f.7.azurestaticapps.net
+```
 
 Fluxo recomendado:
 
@@ -92,16 +103,20 @@ output_location: ""
 app_build_command: "npm run build"
 ```
 
-Nome sugerido do recurso:
+O workflow espera o secret abaixo no GitHub Actions:
 
 ```text
-inteligencia-de-mercado
+AZURE_STATIC_WEB_APPS_API_TOKEN
 ```
 
-Regiao sugerida:
+Para obter o token no Azure:
 
-```text
-Brazil South
+```bash
+az staticwebapp secrets list \
+  --name inteligencia \
+  --resource-group inteligencia \
+  --query "properties.apiKey" \
+  -o tsv
 ```
 
 As variaveis de ambiente sensiveis devem ser configuradas nas configuracoes do Azure Static Web Apps ou nos secrets do GitHub Actions, nao no repositorio.
