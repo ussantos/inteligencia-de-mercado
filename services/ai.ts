@@ -20,7 +20,7 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
   if (!apiKey) return null;
 
   const payload = {
-    unidade: {
+    empresa: {
       nome: base.unidade.nomeFantasia || base.unidade.razaoSocial,
       cnae: `${base.unidade.cnaePrincipalCodigo} - ${base.unidade.cnaePrincipalDescricao}`,
       bairro: base.unidade.bairro,
@@ -44,7 +44,7 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
   const prompt = `
 Você é especialista em inteligência de mercado para negócios B2B e B2C de diferentes setores.
 
-Gere uma complementação em PT-BR, sem substituir a operação atual da unidade analisada. Trabalhe com evolução incremental: manter, melhorar, adicionar, testar antes de alterar e fazer sem prejudicar a operação.
+Gere uma complementação em PT-BR, sem substituir a operação atual da empresa analisada. Trabalhe com evolução incremental: manter, melhorar, adicionar, testar antes de alterar e fazer sem prejudicar a operação.
 
 Responda APENAS JSON válido com os campos camelCase abaixo. Não invente dados estatísticos. Quando houver limitação, declare a limitação.
 

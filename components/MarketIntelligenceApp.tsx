@@ -4,7 +4,7 @@
 // Ele guarda o que a pessoa digitou, consulta CNPJ, le arquivos de CEPs e pede a analise ao servidor.
 // "use client" significa que este codigo roda no navegador, porque precisa reagir a cliques e uploads.
 import { SignOutButton, UserButton, useUser } from '@clerk/nextjs';
-import { AlertTriangle, Building2, CheckCircle2, FileSpreadsheet, Loader2, Radar, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, Radar, ShieldCheck } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -110,7 +110,7 @@ export function MarketIntelligenceApp() {
 
   async function handleCnpjLookup() {
     // Esta funcao chama nossa API de CNPJ.
-    // Se der certo, guardamos os dados do negocio; se der erro, mostramos uma mensagem amigavel.
+    // Se der certo, guardamos os dados da empresa; se der erro, mostramos uma mensagem amigavel.
     setLoadingCnpj(true);
     setGlobalError(null);
     setUnidade(null);
@@ -221,12 +221,12 @@ export function MarketIntelligenceApp() {
         {!result ? (
           <section className="space-y-6">
             <Card>
-              <Badge className="bg-slate-100 text-slate-600">1 — Dados do negócio</Badge>
-              <h2 className="mt-4 text-2xl font-bold text-slate-900">Informe o CNPJ do negócio</h2>
-              <p className="mt-2 text-sm text-slate-500">O sistema consulta bases públicas, identifica endereço, CEP e CNAEs, e usa esses dados para orientar a busca de concorrentes na região.</p>
+              <Badge className="bg-slate-100 text-slate-600">1 — CNPJ da Empresa</Badge>
+              <h2 className="mt-4 text-2xl font-bold text-slate-900">Informe o CNPJ da empresa</h2>
+              <p className="mt-2 text-sm text-slate-500">Carregue os dados da empresa antes de continuar. O sistema consulta bases públicas, identifica endereço, CEP e CNAEs, e usa esses dados para orientar a busca de concorrentes na região.</p>
               <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
                 <Input value={cnpj} onChange={(event) => setCnpj(event.target.value)} placeholder="CNPJ — ex: 12.345.678/0001-90" />
-                <Button onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>{loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />} Consultar CNPJ</Button>
+                <Button className="whitespace-normal text-center md:whitespace-nowrap" onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>{loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />} Carregar dados da minha empresa</Button>
               </div>
 
               {unidade && (
@@ -249,7 +249,7 @@ export function MarketIntelligenceApp() {
               <Badge className="bg-slate-100 text-slate-600">2 — CNAEs analisados</Badge>
               <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha os CNAEs que melhor representam a análise</h2>
               <p className="mt-2 text-sm text-slate-500">A lista é gerada automaticamente a partir do CNPJ. Os CNAEs selecionados ajudam a montar buscas no Google Places e a contextualizar a análise.</p>
-              {!unidade ? <p className="mt-4 text-sm text-slate-500">Consulte o CNPJ para carregar os CNAEs.</p> : <div className="mt-4 grid gap-3">{allCnaes.map((cnae) => <label key={cnaeKey(cnae)} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 hover:bg-slate-50"><input type="checkbox" checked={selectedCnaes.some((item) => cnaeKey(item) === cnaeKey(cnae))} onChange={() => toggleCnae(cnae)} className="mt-1 h-4 w-4" /><span><strong>{cnae.tipo}</strong> · {cnae.codigo ? `${cnae.codigo} — ` : ''}{cnae.descricao}</span></label>)}</div>}
+              {!unidade ? <p className="mt-4 text-sm text-slate-500">Carregue os dados da empresa pelo CNPJ para continuar e listar os CNAEs.</p> : <div className="mt-4 grid gap-3">{allCnaes.map((cnae) => <label key={cnaeKey(cnae)} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 hover:bg-slate-50"><input type="checkbox" checked={selectedCnaes.some((item) => cnaeKey(item) === cnaeKey(cnae))} onChange={() => toggleCnae(cnae)} className="mt-1 h-4 w-4" /><span><strong>{cnae.tipo}</strong> · {cnae.codigo ? `${cnae.codigo} — ` : ''}{cnae.descricao}</span></label>)}</div>}
             </Card>
 
             <Card>
@@ -264,16 +264,19 @@ export function MarketIntelligenceApp() {
             <Card>
               <Badge className="bg-slate-100 text-slate-600">4 — Região e clientes atuais</Badge>
               <h2 className="mt-4 text-xl font-bold text-slate-900">Defina o raio de análise e, opcionalmente, envie CEPs de clientes</h2>
-              <p className="mt-2 text-sm text-slate-500">O upload de CEPs é opcional e serve para demonstrar onde estão os clientes atuais do negócio. Mesmo sem planilha, a ferramenta analisa a região de atuação do empreendimento a partir do raio informado.</p>
+              <p className="mt-2 text-sm text-slate-500">O upload de CEPs é opcional e serve para demonstrar onde estão os clientes atuais da empresa. Mesmo sem planilha, a ferramenta analisa a região de atuação da empresa a partir do raio informado.</p>
               <div className="mt-5 max-w-xs">
-                <label className="text-sm font-semibold text-slate-700">Raio de análise em torno do negócio</label>
+                <label className="text-sm font-semibold text-slate-700">Raio de análise em torno da empresa</label>
                 <Input type="number" min={1} max={50} value={analysisRadiusKm} onChange={(event) => setAnalysisRadiusKm(Number(event.target.value || 8))} />
                 <p className="mt-1 text-xs text-slate-500">Padrão: 8 km. Limite operacional: 1 a 50 km.</p>
               </div>
+              <a href="/modelo-ceps-clientes.csv" download className="mt-5 inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                <Download className="mr-2 h-4 w-4" /> Baixar modelo CSV de CEPs
+              </a>
               <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-orange-400 hover:bg-orange-50">
                 <FileSpreadsheet className="h-10 w-10 text-orange-500" />
                 <span className="mt-3 font-semibold text-slate-800">Selecionar arquivo CSV/XLSX de CEPs, opcional</span>
-                <span className="mt-1 text-sm text-slate-500">Limite de 50MB. Apenas a coluna CEP será processada.</span>
+                <span className="mt-1 text-sm text-slate-500">Use o modelo CSV se quiser começar rápido. Limite de 50MB. Apenas a coluna CEP será processada.</span>
                 <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(event) => handleFile(event.target.files?.[0] || null)} />
               </label>
               {sensitiveWarning && <p className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm text-yellow-800">Foram identificadas colunas que não são necessárias para esta análise. Apenas os CEPs serão processados.</p>}
@@ -287,11 +290,11 @@ export function MarketIntelligenceApp() {
                 <div>
                   <Badge className="bg-orange-100 text-orange-700">5 — Iniciar</Badge>
                   <h2 className="mt-3 text-2xl font-bold text-slate-900">Iniciar análise da região</h2>
-                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ, os CNAEs selecionados, os tipos de concorrentes, o raio de {analysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
+                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, os CNAEs selecionados, os tipos de concorrentes, o raio de {analysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
                 </div>
                 <Button className="min-w-56" onClick={startAnalysis} disabled={!canAnalyze}>{loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />} Iniciar análise</Button>
               </div>
-              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, consulte um CNPJ válido, selecione pelo menos um CNAE e um tipo de concorrente.</p>}
+              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, primeiro carregue os dados da empresa com um CNPJ válido, selecione pelo menos um CNAE e um tipo de concorrente.</p>}
             </Card>
           </section>
         ) : (

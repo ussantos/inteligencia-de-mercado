@@ -1,20 +1,21 @@
 # Inteligencia de Mercado
 
-Aplicacao web independente para analise regional de concorrencia, oportunidades, barreiras comerciais e posicionamento para qualquer tipo de negocio.
+Aplicacao web independente para analise regional de concorrencia, oportunidades, barreiras comerciais e posicionamento para qualquer tipo de empresa.
 
 A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um repositorio GitHub privado ou publico configurado no ambiente de deploy.
 
 ## Proposito
 
-A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ do negocio, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
+A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da empresa, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
 
 ## Funcionalidades
 
-- Consulta de negocio por CNPJ usando fontes publicas, com cache em Postgres.
+- Consulta de empresa por CNPJ usando fontes publicas, com cache em Postgres.
 - Identificacao automatica de endereco, CEP e CNAEs.
 - Selecao de CNAEs e tipos de concorrentes/alternativas de mercado.
 - Analise por raio em torno do empreendimento, com padrao de 8 km.
 - Upload opcional de CSV/XLSX com CEPs de clientes.
+- Modelo CSV baixavel para preencher CEPs antes do upload.
 - Normalizacao e validacao de CEPs.
 - Geocodificacao com LocationIQ e fallback Nominatim.
 - Distancia por linha reta e, quando configurado, rota com OpenRouteService.

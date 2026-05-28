@@ -1,5 +1,5 @@
 ﻿// Este arquivo conversa com o Google Places.
-// Ele procura locais relevantes perto do negocio e transforma a resposta do Google no formato usado pelo relatorio.
+// Ele procura locais relevantes perto da empresa e transforma a resposta do Google no formato usado pelo relatorio.
 // A chave fica no servidor para nao ser exposta no navegador.
 import { prisma } from '@/lib/prisma';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';

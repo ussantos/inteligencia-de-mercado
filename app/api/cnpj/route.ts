@@ -1,4 +1,4 @@
-// Esta API recebe um CNPJ e devolve dados do negocio encontrados em fontes publicas.
+// Esta API recebe um CNPJ e devolve dados da empresa encontrados em fontes publicas.
 // Ela deixa a tela mais simples: o navegador pergunta ao nosso servidor, e o servidor conversa com os servicos externos.
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';

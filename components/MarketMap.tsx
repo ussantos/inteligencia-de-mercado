@@ -1,7 +1,7 @@
 'use client';
 
 // Este componente desenha o mapa.
-// Ele coloca marcadores para o negocio, clientes e concorrentes, usando Leaflet e tiles do OpenStreetMap.
+// Ele coloca marcadores para a empresa, clientes e concorrentes, usando Leaflet e tiles do OpenStreetMap.
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
@@ -25,19 +25,19 @@ async function ensureLeafletPluginsLoaded() {
   leafletPluginsLoaded = true;
 }
 
-const unitIcon = L.divIcon({ html: '<div style="background:#2563eb;color:white;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;border:3px solid white;box-shadow:0 2px 10px #0003">U</div>', className: '', iconSize: [28, 28] });
+const unitIcon = L.divIcon({ html: '<div style="background:#2563eb;color:white;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;border:3px solid white;box-shadow:0 2px 10px #0003">E</div>', className: '', iconSize: [28, 28] });
 const obstacleIcon = L.divIcon({ html: '<div style="background:#f97316;color:white;border-radius:999px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid white;box-shadow:0 2px 10px #0003">!</div>', className: '', iconSize: [26, 26] });
 
 export function MarketMap({ result }: { result: AnalysisResult }) {
-  // A posicao inicial do mapa e o endereco do negocio encontrado pelo CNPJ.
+  // A posicao inicial do mapa e o endereco da empresa encontrado pelo CNPJ.
   const center: [number, number] = [result.unidadeGeo.lat, result.unidadeGeo.lng];
 
   return (
     <MapContainer center={center} zoom={12} scrollWheelZoom className="z-0">
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <LayersControl position="topright">
-        <LayersControl.Overlay checked name="Seu negócio">
-          <Marker position={center} icon={unitIcon}><Popup><strong>Seu negócio</strong><br />{result.unidade.nomeFantasia || result.unidade.razaoSocial}<br />{result.unidadeGeo.endereco}</Popup></Marker>
+        <LayersControl.Overlay checked name="Sua empresa">
+          <Marker position={center} icon={unitIcon}><Popup><strong>Sua empresa</strong><br />{result.unidade.nomeFantasia || result.unidade.razaoSocial}<br />{result.unidadeGeo.endereco}</Popup></Marker>
         </LayersControl.Overlay>
         <LayersControl.Overlay checked name="Alfinetes Individuais">
           <>{result.points.map((point) => <CircleMarker key={point.cep} center={[point.lat, point.lng]} radius={7}><Popup><strong>CEP {formatCep(point.cep)}</strong><br />{point.bairro}, {point.cidade}/{point.uf}<br />Distância: {formatKm(point.distanciaLinhaRetaKm)}</Popup></CircleMarker>)}</>

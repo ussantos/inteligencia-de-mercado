@@ -45,8 +45,8 @@ export const COMPETITOR_TYPE_CONFIGS: CompetitorTypeConfig[] = [
   },
   {
     type: 'Redes e franquias do setor',
-    terms: ['franquia', 'rede', 'unidade', 'filial'],
-    googleQueries: ['franquia do setor', 'rede do setor', 'unidade do setor'],
+    terms: ['franquia', 'rede', 'empresa', 'filial'],
+    googleQueries: ['franquia do setor', 'rede do setor', 'empresa do setor'],
     strategicCategoryHint: 'direto'
   },
   {

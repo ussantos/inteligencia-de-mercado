@@ -80,7 +80,7 @@ function groupByNeighborhood(params: {
 
     const evidenceSource = group.points.length
       ? `${group.points.length} CEP(s) de clientes atuais no bairro.`
-      : `Análise baseada no raio de ${params.radiusKm} km em torno da unidade, sem planilha de CEPs.`;
+      : `Análise baseada no raio de ${params.radiusKm} km em torno da empresa, sem planilha de CEPs.`;
 
     return {
       bairro: group.bairro,
@@ -138,7 +138,7 @@ function buildObstacles(scores: NeighborhoodScore[], places: StrategicPlace[], r
         descricao: 'Há concorrentes com proposta próxima ao segmento analisado no raio definido.',
         evidencias: relatedPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
         impactoEstimado: direct >= 4 ? 'Alto' : 'Médio',
-        acaoRecomendada: `Comparar a proposta da unidade com os concorrentes locais e destacar diferenciais reais de preço, qualidade, conveniência, reputação e atendimento.`,
+        acaoRecomendada: `Comparar a proposta da empresa com os concorrentes locais e destacar diferenciais reais de preço, qualidade, conveniência, reputação e atendimento.`,
         deveSerTestadoAntes: true
       });
     }
@@ -276,7 +276,7 @@ export async function runMarketAnalysis(input: {
   const domain = selectedCnaes.map((cnae) => `${cnae.codigo ? `${cnae.codigo} — ` : ''}${cnae.descricao}`).join(' | ') || input.unidade.cnaePrincipalDescricao;
 
   const unitGeo = await geocodeCep(input.unidade.cep);
-  if (!unitGeo) throw new Error('Não foi possível geocodificar o CEP da unidade obtido pelo CNPJ.');
+  if (!unitGeo) throw new Error('Não foi possível geocodificar o CEP da empresa obtido pelo CNPJ.');
 
   const points: CepPoint[] = [];
   for (const cep of validCeps.slice(0, 500)) {
@@ -334,7 +334,7 @@ export async function runMarketAnalysis(input: {
     strategicPlaces,
     faseMercadoLocal: {
       fase: fase as any,
-      justificativa: `Classificação baseada na região de atuação de ${analysisRadiusKm} km ao redor da unidade, ${points.length} CEP(s) de clientes enviados, ${directCount} concorrente(s) direto(s) e ${indirectCount} concorrente(s) indireto(s) mapeados via Google Places.`,
+      justificativa: `Classificação baseada na região de atuação de ${analysisRadiusKm} km ao redor da empresa, ${points.length} CEP(s) de clientes enviados, ${directCount} concorrente(s) direto(s) e ${indirectCount} concorrente(s) indireto(s) mapeados via Google Places.`,
       cor: fase === 'Mercado Saturado' ? 'vermelho' : fase === 'Mercado Maduro' ? 'laranja' : fase === 'Mercado em Crescimento' ? 'amarelo' : 'verde'
     },
     estatisticas: {
@@ -353,11 +353,11 @@ export async function runMarketAnalysis(input: {
     posicionamentoUnidade: {
       forcasAtuais: [
         `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com CNAE principal ${input.unidade.cnaePrincipalCodigo} — ${input.unidade.cnaePrincipalDescricao}.`,
-        'A análise considera a região real da unidade detectada pelo CNPJ, e não um território genérico.',
+        'A análise considera a região real da empresa detectada pelo CNPJ, e não um território genérico.',
         'Atendimento consultivo, prova social, clareza de oferta e conveniência local são ativos importantes para conversão.'
       ],
       diferenciaisFrenteConcorrentes: [
-        `Frente aos concorrentes mapeados em até ${analysisRadiusKm} km, a unidade deve destacar qualidade, reputação, conveniência, preço percebido e velocidade de atendimento.`,
+        `Frente aos concorrentes mapeados em até ${analysisRadiusKm} km, a empresa deve destacar qualidade, reputação, conveniência, preço percebido e velocidade de atendimento.`,
         'Quando competir com alternativas indiretas, posicionar a oferta pelo problema que resolve melhor e não apenas pela categoria do serviço.',
         'Quando competir com redes ou negócios bem avaliados, reforçar diferenciais locais, atendimento humano e provas concretas.'
       ],
@@ -387,7 +387,7 @@ export async function runMarketAnalysis(input: {
       manter: ['WhatsApp ou canal direto como principal ponto de conversão.', 'Atendimento consultivo como porta de entrada.', 'Comunicação centrada no problema que o negócio resolve.'],
       melhorar: [`Segmentação por bairros dentro do raio de ${analysisRadiusKm} km.`, 'Scripts de objeção por perfil de cliente, bairro e tipo de concorrente.', 'Mensuração de leads por origem geográfica e por concorrente citado.'],
       adicionar: ['Ranking de bairros prioritários para campanhas locais.', 'Lista de concorrentes com avaliação Google para comparação comercial.', 'Campo de objeções no follow-up para validar barreiras regionais.'],
-      testarAntesDeAlterar: ['Campanhas por raio nos bairros com maior afinidade.', 'Mensagens específicas por intenção de compra e nível de urgência.', 'Ofertas pontuais para bairros com maior distância da unidade.'],
+      testarAntesDeAlterar: ['Campanhas por raio nos bairros com maior afinidade.', 'Mensagens específicas por intenção de compra e nível de urgência.', 'Ofertas pontuais para bairros com maior distância da empresa.'],
       fazerSemPrejudicarOperacao: ['Usar os dados como camada de decisão semanal, sem trocar a operação comercial atual.', 'Aplicar testes pequenos antes de mudar investimento, preços ou formato de oferta.']
     },
     diagnosticoFontesPublicas: [
@@ -400,7 +400,7 @@ export async function runMarketAnalysis(input: {
     ],
     planoDeAcao: [
       { prioridade: 1, acao: `Priorizar os bairros com maior afinidade dentro de ${analysisRadiusKm} km para campanhas e follow-up ativo.`, tipo: 'Testar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '7 a 14 dias', custoEstimado: 'Baixo', recursoGratuitoConfirmado: false, responsavelSugerido: 'Comercial/Marketing', kpiParaMedirSucesso: 'Leads qualificados por bairro' },
-      { prioridade: 2, acao: 'Criar argumento comercial comparando a unidade com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },
+      { prioridade: 2, acao: 'Criar argumento comercial comparando a empresa com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },
       { prioridade: 3, acao: 'Registrar no atendimento quais alternativas o cliente está comparando e qual objeção pesa mais.', tipo: 'Adicionar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Atendimento', kpiParaMedirSucesso: 'Objeções registradas por lead e bairro' },
       { prioridade: 4, acao: 'Criar mensagens diferentes para urgência, comparação de preço, busca por qualidade e conveniência local.', tipo: 'Melhorar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '2 semanas', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing', kpiParaMedirSucesso: 'CTR e taxa de resposta por segmento de mensagem' }
     ],

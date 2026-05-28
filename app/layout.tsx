@@ -8,7 +8,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Inteligência de Mercado',
-  description: 'Ferramenta independente de análise regional, concorrência e oportunidade para qualquer tipo de negócio.',
+  description: 'Ferramenta independente de análise regional, concorrência e oportunidade para qualquer tipo de empresa.',
   robots: {
     index: false,
     follow: false
