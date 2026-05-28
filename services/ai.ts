@@ -1,6 +1,10 @@
+// Este arquivo faz o complemento opcional com OpenAI.
+// Se nao houver OPENAI_API_KEY, a aplicacao continua funcionando com as regras locais.
 import type { AnalysisResult } from '@/lib/types';
 
 function extractJson(text: string) {
+  // Modelos de IA as vezes devolvem JSON dentro de blocos de texto.
+  // Esta funcao tenta recortar apenas o objeto JSON para a aplicacao conseguir ler.
   const cleaned = text.replace(/```json|```/g, '').trim();
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
@@ -9,6 +13,8 @@ function extractJson(text: string) {
 }
 
 export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<AnalysisResult> | null> {
+  // Esta funcao pede para a IA melhorar o plano de acao e o posicionamento.
+  // Se a chamada falhar, retornamos null para usar o relatorio local sem quebrar a analise.
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 

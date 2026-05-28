@@ -1,3 +1,5 @@
+// Este arquivo chama o ViaCEP.
+// ViaCEP transforma um CEP brasileiro em endereco, bairro, cidade e estado.
 import { normalizeCep } from '@/lib/cep';
 
 export interface ViaCepResponse {

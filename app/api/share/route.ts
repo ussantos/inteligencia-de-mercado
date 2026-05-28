@@ -1,3 +1,5 @@
+// Esta API cria um link de compartilhamento para uma analise ja salva.
+// O link ganha um codigo aleatorio e uma data de vencimento, para nao ficar publico para sempre.
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Prisma } from '@prisma/client';

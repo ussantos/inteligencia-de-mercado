@@ -1,4 +1,7 @@
-﻿import { prisma } from '@/lib/prisma';
+﻿// Este arquivo conversa com o Google Places.
+// Ele procura locais relevantes perto do negocio e transforma a resposta do Google no formato usado pelo relatorio.
+// A chave fica no servidor para nao ser exposta no navegador.
+import { prisma } from '@/lib/prisma';
 import { haversineKm } from '@/lib/haversine';
 import {
   DEFAULT_COMPETITOR_TYPES,
@@ -34,6 +37,8 @@ function normalizeText(value: string) {
 }
 
 function categoryFromHint(hint: CompetitorTypeConfig['strategicCategoryHint']): CategoriaEstrategica {
+  // Cada tipo de busca tem uma dica: direto, indireto, barreira, polo ou parceria.
+  // Esta funcao converte essa dica em uma categoria que aparece no relatorio.
   if (hint === 'direto') return 'Concorrente direto';
   if (hint === 'barreira') return 'Barreira de acesso ou conveniência';
   if (hint === 'polo') return 'Polo gerador de público';
@@ -83,6 +88,8 @@ async function googleTextSearch(params: {
   lng: number;
   radiusM: number;
 }): Promise<GooglePlace[]> {
+  // Esta chamada vai para a API nova do Google Places.
+  // Pedimos so os campos necessarios para economizar dados e deixar a resposta menor.
   const key = apiKey();
   if (!key) return [];
 
@@ -133,6 +140,8 @@ function buildSearchJobs(input: {
   competitorTypes: CompetitorType[];
   selectedCnaes: CnaeOption[];
 }): Array<{ query: string; config: CompetitorTypeConfig; competitorType: CompetitorType }> {
+  // Um "job" e uma busca que sera enviada ao Google.
+  // Criamos varias buscas combinando tipo de concorrente, CNAE e cidade.
   const configs = getConfigsForCompetitorTypes(input.competitorTypes);
   const municipioUf = `${input.unidade.municipio} ${input.unidade.uf}`.trim();
   const businessTerms = [
@@ -178,6 +187,8 @@ export async function getStrategicPlaces(input: {
   selectedCnaes?: CnaeOption[];
   radiusKm?: number;
 }): Promise<StrategicPlace[]> {
+  // Esta funcao coordena a busca de locais.
+  // Primeiro tenta cache; se nao tiver cache e houver chave Google, chama a API e salva o resultado.
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
   const selectedCnaes = input.selectedCnaes?.length ? input.selectedCnaes : input.unidade.cnaes;
   const radiusM = Math.max(1000, Math.min(50000, Math.round((input.radiusKm || 8) * 1000)));

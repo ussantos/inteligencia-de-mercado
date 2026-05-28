@@ -1,3 +1,5 @@
+// Este arquivo descreve as tabelas do banco de dados.
+// Prisma le este schema e gera um cliente TypeScript para salvar e buscar dados com seguranca.
 generator client {
   provider = "prisma-client-js"
 }

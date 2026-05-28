@@ -1,3 +1,6 @@
+// Esta API e chamada quando o usuario clica para iniciar a analise.
+// Ela valida os dados recebidos, confere se o usuario esta logado e chama o motor principal de inteligencia de mercado.
+// O servidor faz isso para proteger chaves secretas e para poder salvar historico no banco.
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';

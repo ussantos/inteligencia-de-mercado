@@ -1,3 +1,6 @@
+// Este arquivo busca dados de CNPJ em fontes publicas.
+// Ele tenta mais de uma fonte porque APIs publicas podem sair do ar ou limitar chamadas.
+// O resultado e normalizado para a aplicacao sempre receber o mesmo formato.
 import { prisma } from '@/lib/prisma';
 import { normalizeCnpj, validarCNPJ } from '@/lib/cnpj';
 import type { CnaeOption, UnidadeNegocio } from '@/lib/types';

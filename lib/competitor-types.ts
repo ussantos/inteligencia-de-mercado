@@ -1,3 +1,5 @@
+// Este arquivo lista os tipos de concorrentes e locais que a ferramenta pode procurar.
+// Cada tipo tambem tem termos de busca para ajudar o Google Places a encontrar resultados melhores.
 export const COMPETITOR_TYPES = [
   'Todos',
   'Concorrentes diretos pelo CNAE',
@@ -92,6 +94,8 @@ export const COMPETITOR_TYPE_CONFIGS: CompetitorTypeConfig[] = [
 ];
 
 export function getActiveCompetitorTypes(selected: CompetitorType[] | CompetitorType | undefined): Exclude<CompetitorType, 'Todos'>[] {
+  // Se o usuario escolhe "Todos", transformamos isso em todas as categorias reais.
+  // Assim o resto do codigo nao precisa tratar "Todos" como um caso especial o tempo todo.
   const list = Array.isArray(selected) ? selected : selected ? [selected] : DEFAULT_COMPETITOR_TYPES;
   if (!list.length || list.includes('Todos')) return COMPETITOR_TYPE_CONFIGS.map((item) => item.type);
   return list.filter((item): item is Exclude<CompetitorType, 'Todos'> => item !== 'Todos' && isCompetitorType(item));

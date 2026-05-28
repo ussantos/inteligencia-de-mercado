@@ -1,5 +1,8 @@
 'use client';
 
+// Este componente e a tela principal que o usuario usa.
+// Ele guarda o que a pessoa digitou, consulta CNPJ, le arquivos de CEPs e pede a analise ao servidor.
+// "use client" significa que este codigo roda no navegador, porque precisa reagir a cliques e uploads.
 import { SignOutButton, UserButton, useUser } from '@clerk/nextjs';
 import { AlertTriangle, Building2, CheckCircle2, FileSpreadsheet, Loader2, Radar, ShieldCheck } from 'lucide-react';
 import Papa from 'papaparse';
@@ -19,6 +22,8 @@ interface ParsedCeps {
 }
 
 function parseRows(rows: Record<string, unknown>[]): ParsedCeps {
+  // A planilha pode ter muitas colunas, mas a aplicacao so precisa da coluna de CEP.
+  // Se existirem colunas sensiveis, como telefone ou CPF, avisamos o usuario e ignoramos esses dados.
   if (!rows.length) return { ceps: [], errors: ['Nenhum dado encontrado no arquivo.'], sensitiveWarning: false };
   const headers = Object.keys(rows[0]);
   const cepIndex = detectCepColumn(headers);
@@ -40,6 +45,8 @@ function parseRows(rows: Record<string, unknown>[]): ParsedCeps {
 }
 
 async function parseFile(file: File): Promise<ParsedCeps> {
+  // O navegador le CSV e XLSX de formas diferentes.
+  // Aqui decidimos qual leitor usar olhando o final do nome do arquivo.
   if (file.size > 50 * 1024 * 1024) {
     return { ceps: [], errors: ['Arquivo maior que o limite permitido de 50MB'], sensitiveWarning: false };
   }
@@ -71,6 +78,8 @@ function cnaeKey(cnae: CnaeOption) {
 }
 
 export function MarketIntelligenceApp() {
+  // Estes estados sao como caixinhas de memoria da tela.
+  // Cada caixinha guarda uma parte do formulario ou do resultado para o React redesenhar a tela quando algo muda.
   const { user } = useUser();
   const [cnpj, setCnpj] = useState('');
   const [unidade, setUnidade] = useState<UnidadeNegocio | null>(null);
@@ -91,6 +100,8 @@ export function MarketIntelligenceApp() {
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
 
   useEffect(() => {
+    // Quando o CNPJ e encontrado, selecionamos automaticamente o CNAE principal.
+    // Isso ajuda o usuario a comecar sem precisar marcar tudo manualmente.
     if (unidade) {
       const cnaes = unidade.cnaes?.length ? unidade.cnaes : [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }];
       setSelectedCnaes(cnaes.filter((cnae) => cnae.tipo === 'Principal').slice(0, 1));
@@ -98,6 +109,8 @@ export function MarketIntelligenceApp() {
   }, [unidade]);
 
   async function handleCnpjLookup() {
+    // Esta funcao chama nossa API de CNPJ.
+    // Se der certo, guardamos os dados do negocio; se der erro, mostramos uma mensagem amigavel.
     setLoadingCnpj(true);
     setGlobalError(null);
     setUnidade(null);
@@ -134,6 +147,8 @@ export function MarketIntelligenceApp() {
   }
 
   async function handleFile(file: File | null) {
+    // O arquivo e processado no navegador para extrair somente CEPs.
+    // Depois tentamos subir o arquivo para o Azure Blob, mas a analise continua mesmo se esse upload falhar.
     if (!file) return;
     setErrors([]);
     setBlobWarning(null);
@@ -153,6 +168,8 @@ export function MarketIntelligenceApp() {
   }
 
   async function startAnalysis() {
+    // Aqui juntamos CNPJ, CNAEs, tipos de concorrentes, raio e CEPs.
+    // O servidor recebe esse pacote e devolve o relatorio completo.
     if (!unidade) return;
     setLoadingAnalysis(true);
     setGlobalError(null);

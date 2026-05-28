@@ -1,3 +1,5 @@
+// Este arquivo descreve os formatos dos dados da aplicacao.
+// Typescript usa estes "contratos" para avisar quando algum objeto esta faltando campos ou com nomes errados.
 import type { CompetitorType } from '@/lib/competitor-types';
 
 export type DomainOption = string;

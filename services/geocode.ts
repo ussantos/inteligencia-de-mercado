@@ -1,3 +1,5 @@
+// Este arquivo transforma CEP em latitude e longitude.
+// Primeiro pegamos o endereco pelo ViaCEP, depois usamos LocationIQ ou Nominatim para achar o ponto no mapa.
 import { prisma } from '@/lib/prisma';
 import { normalizeCep } from '@/lib/cep';
 import { getViaCep } from '@/services/viacep';
@@ -17,6 +19,8 @@ const NOMINATIM_DELAY_MS = 1100;
 let lastNominatimCall = 0;
 
 async function waitNominatimSlot() {
+  // Nominatim pede para nao receber muitas chamadas seguidas.
+  // Este pequeno atraso ajuda a respeitar o servico gratuito.
   const now = Date.now();
   const elapsed = now - lastNominatimCall;
   if (elapsed < NOMINATIM_DELAY_MS) {
@@ -30,6 +34,7 @@ function buildAddress(parts: { logradouro?: string; bairro?: string; localidade?
 }
 
 export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
+  // Esta funcao recebe um CEP, limpa o texto, procura no cache e, se precisar, chama APIs externas.
   const cep = normalizeCep(cepInput);
   if (cep.length !== 8) return null;
 

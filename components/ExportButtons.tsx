@@ -1,5 +1,7 @@
 'use client';
 
+// Estes botoes exportam o relatorio.
+// PDF e XLSX sao gerados no navegador, entao o servidor nao precisa montar arquivos pesados.
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -9,6 +11,7 @@ import type { AnalysisResult } from '@/lib/types';
 
 export function ExportButtons({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
   async function exportPdf() {
+    // O PDF e criado tirando uma "foto" da area do relatorio e colocando essa imagem em uma pagina A4.
     const element = document.getElementById('analysis-report');
     if (!element) return;
     const canvas = await html2canvas(element, { scale: 1.5, useCORS: true });
@@ -21,6 +24,8 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
   }
 
   function exportXlsx() {
+    // A planilha recebe uma aba para cada tipo de dado importante.
+    // Isso facilita abrir no Excel e filtrar bairros, concorrentes ou plano de acao.
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.points), 'CEPs Analisados');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.afinidadePorBairro), 'Afinidade por Bairro');
@@ -32,6 +37,8 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
   }
 
   async function share() {
+    // Compartilhar cria um link salvo no banco.
+    // Depois copiamos esse link para a area de transferencia do usuario.
     if (!result.id) return;
     const response = await fetch('/api/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analysisId: result.id }) });
     const json = await response.json();

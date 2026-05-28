@@ -1,3 +1,5 @@
+// Este arquivo calcula distancia em linha reta entre dois pontos do mapa.
+// A formula de Haversine considera a curvatura da Terra, entao e melhor que uma conta simples de regua.
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = toRad(b.lat - a.lat);

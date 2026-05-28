@@ -1,3 +1,6 @@
+// Esta e a tela de entrada.
+// Ela mostra um botao do Clerk; o Clerk cuida de senha, email, sessao e redirecionamento.
+// Depois do login, a pessoa volta para a raiz "/", onde fica a ferramenta.
 import { SignInButton } from '@clerk/nextjs';
 
 export default function SignInPage() {

@@ -1,3 +1,5 @@
+// Este arquivo calcula distancias.
+// Sempre temos a distancia em linha reta; quando existe chave do OpenRouteService, tambem tentamos distancia de carro.
 import { prisma } from '@/lib/prisma';
 import { haversineKm } from '@/lib/haversine';
 

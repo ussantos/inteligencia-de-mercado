@@ -1,3 +1,5 @@
+// Configuracao do Tailwind CSS.
+// Ela diz em quais pastas o Tailwind deve procurar classes e define pequenas cores do tema.
 import type { Config } from 'tailwindcss';
 
 const config: Config = {

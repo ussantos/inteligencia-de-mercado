@@ -1,3 +1,5 @@
+// Este arquivo cuida de CNPJ.
+// Ele remove pontuacao e valida os digitos verificadores, que funcionam como uma prova matematica de que o CNPJ pode existir.
 export function normalizeCnpj(cnpj: string) {
   return cnpj.replace(/\D/g, '').slice(0, 14);
 }

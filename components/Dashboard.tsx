@@ -1,5 +1,7 @@
 'use client';
 
+// Este componente mostra o relatorio final.
+// Ele pega o resultado calculado pelo servidor e transforma em secoes, graficos, listas, mapa e botoes de exportacao.
 import { AlertTriangle, Star } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ExportButtons } from '@/components/ExportButtons';
@@ -9,6 +11,8 @@ import type { AnalysisResult } from '@/lib/types';
 import { formatKm } from '@/lib/utils';
 
 const MarketMap = dynamic(
+  // O mapa usa APIs do navegador, como window e document.
+  // Por isso carregamos o mapa so no cliente, evitando erro durante a renderizacao no servidor.
   () => import('@/components/MarketMap').then((mod) => mod.MarketMap),
   {
     ssr: false,
@@ -44,6 +48,8 @@ function starLabel(rating?: number | null, count?: number | null) {
 }
 
 export function Dashboard({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
+  // Aqui calculamos contadores simples para a parte superior do relatorio.
+  // O relatorio ja vem pronto, mas esses numeros ajudam a tela a exibir um resumo rapido.
   const faseColor = result.faseMercadoLocal.cor === 'verde' ? 'bg-emerald-100 text-emerald-700' : result.faseMercadoLocal.cor === 'amarelo' ? 'bg-yellow-100 text-yellow-800' : result.faseMercadoLocal.cor === 'laranja' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700';
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
   const direct = result.strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente direto' || p.categoriaEstrategica === 'Concorrente direto de tecnologia').length;

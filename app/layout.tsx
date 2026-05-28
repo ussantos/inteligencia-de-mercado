@@ -1,3 +1,6 @@
+// Este arquivo e a "moldura" de todas as paginas do site.
+// Ele coloca o ClerkProvider em volta da aplicacao para que login, usuario e seguranca funcionem em qualquer tela.
+// Tambem define titulo, descricao e regra para buscadores nao indexarem a ferramenta.
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ptBR } from '@clerk/localizations';

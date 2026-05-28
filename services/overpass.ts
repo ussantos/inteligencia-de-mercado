@@ -1,3 +1,5 @@
+// Este arquivo e um caminho legado usando OpenStreetMap/Overpass.
+// Hoje a aplicacao principal usa Google Places, mas este codigo ajuda como referencia ou fallback futuro.
 import { prisma } from '@/lib/prisma';
 import { haversineKm } from '@/lib/haversine';
 import { DEFAULT_COMPETITOR_TYPE, getConfigsForCompetitorType, type CompetitorType, type CompetitorTypeConfig } from '@/lib/competitor-types';

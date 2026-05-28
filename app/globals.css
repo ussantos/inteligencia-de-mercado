@@ -1,3 +1,6 @@
+/* Este arquivo guarda estilos globais.
+   Ele carrega o Tailwind CSS e define pequenos ajustes que valem para o site inteiro,
+   como comportamento de impressao e aparencia do mapa. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

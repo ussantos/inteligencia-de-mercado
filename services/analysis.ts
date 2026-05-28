@@ -1,3 +1,6 @@
+// Este arquivo e o "cerebro" da analise.
+// Ele junta CEPs, CNPJ, CNAEs, concorrentes, distancias e regras simples para montar o relatorio final.
+// Pense nele como uma cozinha: recebe varios ingredientes e devolve um prato organizado.
 import { prisma } from '@/lib/prisma';
 import { normalizeCep, isValidCep } from '@/lib/cep';
 import { clamp } from '@/lib/utils';
@@ -9,6 +12,8 @@ import { DEFAULT_COMPETITOR_TYPES, type CompetitorType } from '@/lib/competitor-
 import type { AnalysisResult, CepPoint, CnaeOption, NeighborhoodScore, Persona, StrategicPlace, UnidadeNegocio } from '@/lib/types';
 
 function median(values: number[]) {
+  // Mediana e o numero que fica no meio da lista ordenada.
+  // Ela evita que um valor muito fora do normal bagunce a leitura das distancias.
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
@@ -30,6 +35,8 @@ function groupByNeighborhood(params: {
   unitLng: number;
   radiusKm: number;
 }): NeighborhoodScore[] {
+  // Aqui juntamos clientes e concorrentes por bairro.
+  // Depois damos uma nota para cada bairro, misturando distancia, concorrencia, polos e avaliacoes.
   const keys = new Map<string, { bairro: string; cidade: string; points: CepPoint[]; places: StrategicPlace[] }>();
   const defaultKey = `${params.unidade.bairro}||${params.unidade.municipio}`;
   keys.set(defaultKey, { bairro: params.unidade.bairro, cidade: params.unidade.municipio, points: [], places: [] });
@@ -116,6 +123,8 @@ function buildDistribuicao(points: CepPoint[]) {
 }
 
 function buildObstacles(scores: NeighborhoodScore[], places: StrategicPlace[], radiusKm: number): AnalysisResult['obstaculosMatricula'] {
+  // Obstaculos sao coisas que podem dificultar a venda.
+  // Exemplo: muitos concorrentes diretos, muita alternativa indireta ou distancia alta.
   return scores.slice(0, 8).flatMap((score) => {
     const relatedPlaces = places.filter((place) => (place.bairro || score.bairro) === score.bairro || !place.bairro);
     const direct = score.concorrentesDiretos;
@@ -201,6 +210,8 @@ function persona(input: {
 }
 
 function buildPersonas(unidade: UnidadeNegocio, topBairro: string): Persona[] {
+  // Personas sao personagens ficticios que representam tipos de clientes.
+  // Elas ajudam marketing e atendimento a imaginar melhor para quem estao falando.
   const segment = unidade.cnaePrincipalDescricao || 'segmento analisado';
   return [
     persona({
@@ -254,6 +265,8 @@ export async function runMarketAnalysis(input: {
   competitorTypes?: CompetitorType[];
   analysisRadiusKm?: number;
 }): Promise<AnalysisResult> {
+  // Esta e a funcao principal.
+  // Ela valida CEPs, geocodifica enderecos, busca concorrentes, calcula rankings e salva tudo no banco.
   const rawCeps = Array.isArray(input.ceps) ? input.ceps : [];
   const validCeps = [...new Set(rawCeps.map(normalizeCep).filter(isValidCep))];
   const invalidCeps = rawCeps.map(String).filter((cep) => cep.trim() && !isValidCep(cep));

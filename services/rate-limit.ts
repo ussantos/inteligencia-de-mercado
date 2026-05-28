@@ -1,3 +1,5 @@
+// Este arquivo limita quantas analises um usuario pode fazer por hora.
+// Isso evita abuso, gasto inesperado com APIs externas e sobrecarga do banco.
 import { prisma } from '@/lib/prisma';
 
 export async function assertUserRateLimit(userId: string) {

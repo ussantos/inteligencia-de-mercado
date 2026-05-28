@@ -1,3 +1,5 @@
+// Configuracao do Next.js.
+// Aqui desligamos o header "powered by", ativamos verificacoes extras do React e liberamos imagens dos tiles do mapa.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,

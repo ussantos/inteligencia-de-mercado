@@ -2,18 +2,18 @@
 
 Aplicacao web independente para analise regional de concorrencia, oportunidades, barreiras comerciais e posicionamento para qualquer tipo de negocio.
 
-A aplicacao esta preparada para rodar no Azure Static Web Apps `inteligencia`, conectada ao repositorio GitHub `https://github.com/ussantos/inteligencia-de-mercado`, branch `main`.
+A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um repositorio GitHub privado ou publico configurado no ambiente de deploy.
 
 ## Proposito
 
-A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da unidade, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
+A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ do negocio, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
 
 ## Funcionalidades
 
-- Consulta de unidade por CNPJ usando fontes publicas, com cache em Postgres.
+- Consulta de negocio por CNPJ usando fontes publicas, com cache em Postgres.
 - Identificacao automatica de endereco, CEP e CNAEs.
 - Selecao de CNAEs e tipos de concorrentes/alternativas de mercado.
-- Analise por raio em torno da unidade, com padrao de 8 km.
+- Analise por raio em torno do empreendimento, com padrao de 8 km.
 - Upload opcional de CSV/XLSX com CEPs de clientes.
 - Normalizacao e validacao de CEPs.
 - Geocodificacao com LocationIQ e fallback Nominatim.
@@ -47,19 +47,22 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Deploy: Azure Static Web Apps com GitHub Actions.
 - Runtime API no Azure: Node 22.
 
+## Leitura do codigo
+
+Como este repositorio pode ser publico, os arquivos principais possuem comentarios explicativos em linguagem simples. A ideia e ajudar novos leitores a entenderem o fluxo da aplicacao sem precisar conhecer Next.js, Prisma, Clerk, Azure ou Google Places em profundidade.
+
+Os comentarios explicam o papel de paginas, componentes, APIs, servicos, tipos e configuracoes. Eles nao devem conter tokens, URLs privadas, connection strings, dados de clientes ou detalhes internos do ambiente de producao.
+
 ## Azure Static Web App
 
-Instancia de destino:
+Ambiente de destino:
 
 ```text
-Resource name: inteligencia
-Resource group: inteligencia
-Region: East US 2
-SKU: Free
-Default hostname: gray-glacier-0dc52610f.7.azurestaticapps.net
-Repository: https://github.com/ussantos/inteligencia-de-mercado
+Hosting: Azure Static Web Apps
+SKU: Free ou superior
+Provider: GitHub Actions
 Branch: main
-Provider: GitHub
+Runtime API: Node 22
 ```
 
 Configuracao do workflow:
@@ -162,12 +165,12 @@ O workflow exige o secret:
 AZURE_STATIC_WEB_APPS_API_TOKEN
 ```
 
-Para obter o token da SWA:
+Para obter o token da SWA, substitua os placeholders pelo nome do recurso e resource group do ambiente:
 
 ```bash
 az staticwebapp secrets list \
-  --name inteligencia \
-  --resource-group inteligencia \
+  --name <STATIC_WEB_APP_NAME> \
+  --resource-group <RESOURCE_GROUP_NAME> \
   --query "properties.apiKey" \
   -o tsv
 ```
@@ -176,8 +179,8 @@ Para confirmar se a SWA esta conectada ao repo correto:
 
 ```bash
 az staticwebapp show \
-  --name inteligencia \
-  --resource-group inteligencia \
+  --name <STATIC_WEB_APP_NAME> \
+  --resource-group <RESOURCE_GROUP_NAME> \
   --query "{provider:provider, repo:repositoryUrl, branch:branch, hostname:defaultHostname}" \
   -o json
 ```
@@ -187,9 +190,9 @@ Resultado esperado:
 ```json
 {
   "provider": "GitHub",
-  "repo": "https://github.com/ussantos/inteligencia-de-mercado",
+  "repo": "https://github.com/<owner>/<repo>",
   "branch": "main",
-  "hostname": "gray-glacier-0dc52610f.7.azurestaticapps.net"
+  "hostname": "<default-hostname>.azurestaticapps.net"
 }
 ```
 

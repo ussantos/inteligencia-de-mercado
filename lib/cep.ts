@@ -1,3 +1,5 @@
+// Este arquivo cuida de CEP.
+// Ele limpa caracteres, valida tamanho e tenta descobrir qual coluna de uma planilha contem CEPs.
 export function normalizeCep(cep: string) {
   return cep.replace(/\D/g, '').slice(0, 8);
 }

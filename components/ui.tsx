@@ -1,3 +1,5 @@
+// Este arquivo guarda pecas pequenas de interface reutilizaveis.
+// Em vez de repetir classes de botao, card e input em varias telas, usamos estes componentes.
 import type { HTMLAttributes, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 

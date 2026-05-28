@@ -1,5 +1,7 @@
 'use client';
 
+// Este componente desenha o mapa.
+// Ele coloca marcadores para o negocio, clientes e concorrentes, usando Leaflet e tiles do OpenStreetMap.
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
@@ -13,6 +15,8 @@ import { formatCep, formatKm } from '@/lib/utils';
 let leafletPluginsLoaded = false;
 
 async function ensureLeafletPluginsLoaded() {
+  // Alguns plugins do Leaflet so existem no navegador.
+  // Por isso carregamos esses plugins apenas depois que a pagina ja esta rodando no computador da pessoa.
   if (leafletPluginsLoaded) return;
   if (typeof window === 'undefined') return;
   (window as typeof window & { L?: typeof L }).L = L;
@@ -25,6 +29,7 @@ const unitIcon = L.divIcon({ html: '<div style="background:#2563eb;color:white;b
 const obstacleIcon = L.divIcon({ html: '<div style="background:#f97316;color:white;border-radius:999px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid white;box-shadow:0 2px 10px #0003">!</div>', className: '', iconSize: [26, 26] });
 
 export function MarketMap({ result }: { result: AnalysisResult }) {
+  // A posicao inicial do mapa e o endereco do negocio encontrado pelo CNPJ.
   const center: [number, number] = [result.unidadeGeo.lat, result.unidadeGeo.lng];
 
   return (

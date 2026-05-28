@@ -1,3 +1,5 @@
+// Esta API lista as analises antigas do usuario logado.
+// Cada usuario so ve o proprio historico, porque filtramos pelo userId do Clerk.
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';

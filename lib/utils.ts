@@ -1,3 +1,5 @@
+// Este arquivo guarda funcoes pequenas usadas em varias telas.
+// Exemplos: juntar classes CSS, formatar CEP/CNPJ e limitar numeros dentro de uma faixa.
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

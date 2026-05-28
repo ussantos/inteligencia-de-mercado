@@ -1,3 +1,5 @@
+// Esta API cria uma URL temporaria para upload no Azure Blob Storage.
+// Assim o navegador consegue enviar o arquivo direto para o storage sem conhecer a connection string secreta.
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createUploadSasUrl } from '@/services/blob';

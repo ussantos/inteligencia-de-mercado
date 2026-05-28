@@ -1,3 +1,6 @@
+// Esta pagina abre um relatorio compartilhado usando um codigo unico na URL.
+// Ela e somente leitura: quem recebe o link consegue ver a analise, mas nao editar nem criar outra.
+// Se o link nao existir ou estiver vencido, mostramos pagina nao encontrada.
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Dashboard } from '@/components/Dashboard';

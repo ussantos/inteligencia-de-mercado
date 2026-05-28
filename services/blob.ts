@@ -1,3 +1,5 @@
+// Este arquivo cria URLs temporarias para upload no Azure Blob Storage.
+// A URL temporaria permite enviar arquivo sem revelar a connection string secreta ao navegador.
 import { BlobSASPermissions, BlobServiceClient } from '@azure/storage-blob';
 
 export async function createUploadSasUrl(fileName: string) {
