@@ -9,9 +9,12 @@ export interface CnaeOption {
 }
 
 export type CategoriaEstrategica =
+  | 'Concorrente direto'
+  | 'Concorrente indireto'
   | 'Concorrente direto de tecnologia'
   | 'Concorrente indireto extracurricular'
   | 'Barreira potencial de agenda'
+  | 'Barreira de acesso ou conveniência'
   | 'Escola regular mapeada'
   | 'Polo gerador de público'
   | 'Oportunidade de parceria'
@@ -98,6 +101,9 @@ export interface Persona {
   filhoIdade: string;
   filhoPerfil: string;
   papelDoFilhoNaDecisao: string;
+  decisorPrincipal?: string;
+  perfilComprador?: string;
+  papelNaDecisao?: string;
   motivacoes: string[];
   doresEObjecoes: string[];
   canaisPreferidos: string[];
@@ -152,8 +158,6 @@ export interface AnalysisResult {
     ajustesIncrementaisSugeridos: string[];
     hipotesesParaTestar: string[];
   };
-  /** Mantido por compatibilidade com relatórios compartilhados antigos. */
-  posicionamentoMyRobot?: AnalysisResult['posicionamentoUnidade'];
   personas: Persona[];
   evolucaoIncremental: {
     manter: string[];

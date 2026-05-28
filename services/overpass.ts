@@ -21,10 +21,11 @@ function unique<T>(items: T[]) {
 }
 
 function categoryFromHint(hint: CompetitorTypeConfig['strategicCategoryHint']): CategoriaEstrategica {
-  if (hint === 'direto') return 'Concorrente direto de tecnologia';
-  if (hint === 'barreira') return 'Barreira potencial de agenda';
+  if (hint === 'direto') return 'Concorrente direto';
+  if (hint === 'barreira') return 'Barreira de acesso ou conveniência';
   if (hint === 'polo') return 'Polo gerador de público';
-  return 'Concorrente indireto extracurricular';
+  if (hint === 'parceria') return 'Oportunidade de parceria';
+  return 'Concorrente indireto';
 }
 
 function classifyByTags(tags: Record<string, string>): { categoria: CategoriaEstrategica; subcategoria: string; confiabilidade: 'Alta' | 'Média' | 'Baixa'; observacao: string } {
@@ -38,18 +39,18 @@ function classifyByTags(tags: Record<string, string>): { categoria: CategoriaEst
   }
   if (tags.amenity === 'language_school' || tags.amenity === 'music_school' || tags.amenity === 'arts_centre') {
     return {
-      categoria: 'Concorrente indireto extracurricular',
-      subcategoria: 'Atividade extracurricular concorrente por tempo e orçamento familiar',
+      categoria: 'Concorrente indireto',
+      subcategoria: 'Oferta substituta ou concorrente indireta',
       confiabilidade: 'Média',
-      observacao: 'Pode competir pela agenda da criança e pelo orçamento destinado a atividades extracurriculares.'
+      observacao: 'Pode competir por atenção, orçamento ou conveniência do mesmo público-alvo.'
     };
   }
   if (tags.leisure === 'sports_centre' || tags.leisure === 'fitness_centre' || tags.sport || tags.club) {
     return {
-      categoria: 'Concorrente indireto extracurricular',
+      categoria: 'Concorrente indireto',
       subcategoria: 'Esporte, clube ou atividade física/recreativa',
       confiabilidade: 'Média',
-      observacao: 'Pode disputar a agenda semanal e o orçamento familiar com cursos extracurriculares.'
+      observacao: 'Pode disputar orçamento, tempo ou fluxo com a oferta analisada.'
     };
   }
   if (tags.shop === 'mall' || tags.leisure === 'park' || tags.amenity === 'community_centre' || tags.amenity === 'place_of_worship') {
@@ -76,13 +77,13 @@ function classify(tags: Record<string, string>, configs: CompetitorTypeConfig[])
     const matched = config.terms.some((term) => searchable.includes(normalizeText(term)));
     if (matched) {
       const categoria = categoryFromHint(config.strategicCategoryHint);
-      const obs = categoria === 'Concorrente direto de tecnologia'
-        ? 'O nome ou descrição sugere atuação próxima à proposta da My Robot.'
-        : categoria === 'Barreira potencial de agenda'
-          ? 'Pode indicar rotina escolar, contraturno ou carga de agenda que precisa ser validada no atendimento.'
+      const obs = categoria === 'Concorrente direto'
+        ? 'O nome ou descrição sugere atuação próxima ao segmento analisado.'
+        : categoria === 'Barreira de acesso ou conveniência'
+          ? 'Pode indicar barreira de acesso, conveniência ou fluxo que precisa ser validada no atendimento.'
           : categoria === 'Polo gerador de público'
             ? 'Pode concentrar famílias e apoiar parcerias, eventos ou ações locais.'
-            : 'Pode competir pela agenda da criança e pelo orçamento destinado a atividades extracurriculares.';
+            : 'Pode competir por atenção, orçamento ou conveniência do mesmo público-alvo.';
       return {
         categoria,
         subcategoria: config.type,
@@ -99,7 +100,7 @@ function classify(tags: Record<string, string>, configs: CompetitorTypeConfig[])
 
 function buildNameRegex(configs: CompetitorTypeConfig[]) {
   const terms = unique(configs.flatMap((config) => config.terms)).map(escapeRegexTerm);
-  return terms.length ? terms.join('|') : 'robótica|robotica|programação|programacao|tecnologia|escola|curso';
+  return terms.length ? terms.join('|') : 'empresa|serviço|servico|loja|comércio|comercio|clínica|clinica|curso|consultoria';
 }
 
 function buildOverpassQuery(lat: number, lng: number, radiusM: number, competitorType: CompetitorType) {
@@ -212,7 +213,7 @@ export async function getStrategicPlaces(input: {
   const places: StrategicPlace[] = mappedPlaces
     .filter((place: StrategicPlace | null): place is StrategicPlace => place !== null)
     .sort((a: StrategicPlace, b: StrategicPlace) => {
-      const weight = (item: StrategicPlace) => item.categoriaEstrategica === 'Concorrente direto de tecnologia' ? 0 : item.categoriaEstrategica === 'Concorrente indireto extracurricular' ? 1 : item.categoriaEstrategica === 'Barreira potencial de agenda' ? 2 : 3;
+      const weight = (item: StrategicPlace) => item.categoriaEstrategica === 'Concorrente direto' || item.categoriaEstrategica === 'Concorrente direto de tecnologia' ? 0 : item.categoriaEstrategica === 'Concorrente indireto' || item.categoriaEstrategica === 'Concorrente indireto extracurricular' ? 1 : item.categoriaEstrategica === 'Barreira de acesso ou conveniência' || item.categoriaEstrategica === 'Barreira potencial de agenda' ? 2 : 3;
       return weight(a) - weight(b) || (a.distanciaKm || 0) - (b.distanciaKm || 0);
     })
     .slice(0, 180);
@@ -224,7 +225,7 @@ export async function getStrategicPlaces(input: {
       cacheKey,
       cep: input.center.cep,
       domain: input.domain,
-      searchType: `extracurricular-5-17:${competitorType}`,
+      searchType: `market-intelligence:${competitorType}`,
       resultsJson: places as any,
       expiresAt: new Date(Date.now() + TTL_30_DAYS)
     }

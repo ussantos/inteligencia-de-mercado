@@ -177,8 +177,8 @@ export function MarketIntelligenceApp() {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">My Robot</p>
-            <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Análise de Concorrência</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligência de Mercado</p>
+            <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Análise regional de concorrência</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-slate-500 md:inline">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</span>
@@ -238,7 +238,7 @@ export function MarketIntelligenceApp() {
             <Card>
               <Badge className="bg-slate-100 text-slate-600">3 — Tipos de concorrentes</Badge>
               <h2 className="mt-4 text-xl font-bold text-slate-900">Selecione um ou mais tipos de concorrentes</h2>
-              <p className="mt-2 text-sm text-slate-500">“Todos” é o padrão e amplia a busca. Para análises mais objetivas, selecione categorias específicas.</p>
+              <p className="mt-2 text-sm text-slate-500">“Todos” é o padrão e combina buscas pelo segmento, CNAE e categorias regionais. Para análises mais objetivas, selecione categorias específicas.</p>
               <div className="mt-4 grid gap-2 md:grid-cols-2">
                 {COMPETITOR_TYPES.map((type) => <label key={type} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 text-sm hover:bg-slate-50"><input type="checkbox" checked={competitorTypes.includes(type)} onChange={() => toggleCompetitorType(type)} className="mt-1 h-4 w-4" /><span>{type}</span></label>)}
               </div>

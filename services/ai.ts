@@ -35,7 +35,7 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
   };
 
   const prompt = `
-Você é especialista em inteligência de mercado B2C para cursos extracurriculares de tecnologia, robótica, programação e IA para crianças e adolescentes de 5 a 17 anos.
+Você é especialista em inteligência de mercado para negócios B2B e B2C de diferentes setores.
 
 Gere uma complementação em PT-BR, sem substituir a operação atual da unidade analisada. Trabalhe com evolução incremental: manter, melhorar, adicionar, testar antes de alterar e fazer sem prejudicar a operação.
 

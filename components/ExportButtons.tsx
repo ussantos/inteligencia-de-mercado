@@ -17,7 +17,7 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
     const width = pdf.internal.pageSize.getWidth();
     const height = (canvas.height * width) / canvas.width;
     pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-    pdf.save('relatorio-inteligencia-myrobot.pdf');
+    pdf.save('relatorio-inteligencia-mercado.pdf');
   }
 
   function exportXlsx() {
@@ -28,7 +28,7 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.perfilEconomico), 'Perfil Econômico');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.personas), 'Personas');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.planoDeAcao), 'Plano de Ação');
-    XLSX.writeFile(wb, 'analise-inteligencia-myrobot.xlsx');
+    XLSX.writeFile(wb, 'analise-inteligencia-mercado.xlsx');
   }
 
   async function share() {

@@ -50,9 +50,9 @@ function groupByNeighborhood(params: {
   }
 
   return [...keys.values()].map((group) => {
-    const direct = group.places.filter((place) => place.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
-    const indirect = group.places.filter((place) => place.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
-    const barriers = group.places.filter((place) => place.categoriaEstrategica === 'Barreira potencial de agenda').length;
+    const direct = group.places.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
+    const indirect = group.places.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
+    const barriers = group.places.filter((place) => place.categoriaEstrategica === 'Barreira de acesso ou conveniência' || place.categoriaEstrategica === 'Barreira potencial de agenda').length;
     const poles = group.places.filter((place) => place.categoriaEstrategica === 'Polo gerador de público').length;
     const avgDistance = group.points.length
       ? group.points.reduce((acc, p) => acc + p.distanciaLinhaRetaKm, 0) / group.points.length
@@ -88,7 +88,7 @@ function groupByNeighborhood(params: {
         evidenceSource,
         `${direct} concorrente(s) direto(s) mapeado(s) no Google Places.`,
         `${indirect} concorrente(s) indireto(s) mapeado(s).`,
-        `${barriers} possível(is) barreira(s) de agenda escolar ou contraturno.`
+        `${barriers} possível(is) barreira(s) de acesso, conveniência ou decisão de compra.`
       ],
       limitacoes: [
         'O perfil financeiro por bairro é uma estimativa operacional, não um dado censitário individual.',
@@ -120,27 +120,27 @@ function buildObstacles(scores: NeighborhoodScore[], places: StrategicPlace[], r
     const relatedPlaces = places.filter((place) => (place.bairro || score.bairro) === score.bairro || !place.bairro);
     const direct = score.concorrentesDiretos;
     const indirect = score.concorrentesIndiretos;
-    const barriers = relatedPlaces.filter((place) => place.categoriaEstrategica === 'Barreira potencial de agenda');
+    const barriers = relatedPlaces.filter((place) => place.categoriaEstrategica === 'Barreira de acesso ou conveniência' || place.categoriaEstrategica === 'Barreira potencial de agenda');
     const items: AnalysisResult['obstaculosMatricula'] = [];
     if (direct > 0) {
       items.push({
         bairro: score.bairro,
-        tipoObstaculo: 'Concorrência direta de tecnologia',
-        descricao: 'Há concorrentes com proposta próxima no raio analisado, incluindo tecnologia, programação, robótica, games ou maker.',
-        evidencias: relatedPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente direto de tecnologia').slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
+        tipoObstaculo: 'Concorrência direta',
+        descricao: 'Há concorrentes com proposta próxima ao segmento analisado no raio definido.',
+        evidencias: relatedPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
         impactoEstimado: direct >= 4 ? 'Alto' : 'Médio',
-        acaoRecomendada: `Comparar a proposta da unidade com os concorrentes locais e destacar diferenciais por idade, projeto prático, metodologia e aula experimental.`,
+        acaoRecomendada: `Comparar a proposta da unidade com os concorrentes locais e destacar diferenciais reais de preço, qualidade, conveniência, reputação e atendimento.`,
         deveSerTestadoAntes: true
       });
     }
     if (indirect >= 3) {
       items.push({
         bairro: score.bairro,
-        tipoObstaculo: 'Disputa por agenda extracurricular',
-        descricao: 'Atividades como idiomas, esportes, artes, música, reforço e entretenimento disputam tempo e orçamento familiar.',
-        evidencias: relatedPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente indireto extracurricular').slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
+        tipoObstaculo: 'Disputa por alternativas de compra',
+        descricao: 'Ofertas substitutas ou indiretas podem capturar orçamento, atenção e conveniência do mesmo público.',
+        evidencias: relatedPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular').slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
         impactoEstimado: 'Médio',
-        acaoRecomendada: 'Tratar tecnologia como complemento estratégico e desenvolvimento de futuro, não como substituto genérico de outras atividades.',
+        acaoRecomendada: 'Explicitar quando a oferta é melhor escolha que alternativas indiretas, usando benefícios objetivos e provas locais.',
         deveSerTestadoAntes: true
       });
     }
@@ -158,11 +158,11 @@ function buildObstacles(scores: NeighborhoodScore[], places: StrategicPlace[], r
     if (barriers.length) {
       items.push({
         bairro: score.bairro,
-        tipoObstaculo: 'Possível barreira de agenda escolar',
-        descricao: 'Foram identificadas escolas, colégios ou programas de contraturno que podem disputar a disponibilidade das crianças e adolescentes.',
+        tipoObstaculo: 'Possível barreira de acesso ou conveniência',
+        descricao: 'Foram identificados locais ou condições regionais que podem afetar fluxo, conveniência, comparação ou decisão de compra.',
         evidencias: barriers.slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
         impactoEstimado: barriers.length >= 4 ? 'Médio' : 'Baixo',
-        acaoRecomendada: 'Perguntar no atendimento se a criança estuda em horário integral ou contraturno e ajustar a oferta somente após validação.',
+        acaoRecomendada: 'Validar com clientes reais quais fatores pesam mais na decisão: preço, acesso, prazo, confiança, disponibilidade ou conveniência.',
         deveSerTestadoAntes: true
       });
     }
@@ -170,26 +170,79 @@ function buildObstacles(scores: NeighborhoodScore[], places: StrategicPlace[], r
   });
 }
 
+function persona(input: {
+  nome: string;
+  decisor: string;
+  perfil: string;
+  motivacoes: string[];
+  dores: string[];
+  canais: string[];
+  gatilhos: string[];
+  mensagem: string;
+}): Persona {
+  return {
+    nomeFicticio: input.nome,
+    idade: input.decisor,
+    decisorPrincipal: input.decisor,
+    perfilComprador: input.perfil,
+    papelNaDecisao: 'Decisor ou influenciador relevante para a compra.',
+    filhoIdade: 'Não se aplica',
+    filhoPerfil: input.perfil,
+    papelDoFilhoNaDecisao: 'Não se aplica ao modelo genérico de negócio.',
+    perfilFamiliar: input.perfil,
+    classeAbepEstimativa: 'A definir com dados reais de ticket, recorrência e origem dos clientes.',
+    motivacoes: input.motivacoes,
+    doresEObjecoes: input.dores,
+    canaisPreferidos: input.canais,
+    disponibilidadeDeCompra: 'Depende de urgência, confiança, conveniência, preço percebido e prova social local.',
+    gatilhosDeDecisao: input.gatilhos,
+    mensagemRecomendada: input.mensagem
+  };
+}
+
 function buildPersonas(unidade: UnidadeNegocio, topBairro: string): Persona[] {
+  const segment = unidade.cnaePrincipalDescricao || 'segmento analisado';
   return [
-    {
-      nomeFicticio: 'Mariana e Lucas, 8 anos', idade: 'Mãe de 38–45 anos', filhoIdade: '8 anos', filhoPerfil: 'Criança curiosa, gosta de montar coisas, robôs, peças e desafios concretos.', papelDoFilhoNaDecisao: 'Alto: se ele se encanta na aula experimental, a chance de matrícula sobe muito.', perfilFamiliar: `Família próxima de ${topBairro}, busca atividade com propósito e menos tela passiva.`, classeAbepEstimativa: 'A/B ou C alta, conforme recorrência de leads e ticket do curso.', motivacoes: ['Desenvolver raciocínio lógico', 'Reduzir consumo passivo de telas', 'Encontrar uma atividade que gere orgulho e evolução visível'], doresEObjecoes: ['Medo de compromisso longo', 'Dúvida se a criança vai manter interesse', 'Agenda semanal cheia'], canaisPreferidos: ['WhatsApp', 'Instagram', 'Indicação de outros pais'], disponibilidadeDeCompra: 'Alta quando a aula experimental demonstra segurança, acolhimento e evolução prática.', gatilhosDeDecisao: ['Aula experimental', 'Foto/vídeo do projeto montado', 'Explicação da trilha por idade'], mensagemRecomendada: 'Transforme curiosidade em criação: uma aula prática para seu filho montar, testar e se orgulhar do que fez.'
-    },
-    {
-      nomeFicticio: 'Ricardo e Pedro, 13 anos', idade: 'Pai de 42–52 anos', filhoIdade: '13 anos', filhoPerfil: 'Adolescente interessado em games, YouTube, IA e aplicativos.', papelDoFilhoNaDecisao: 'Muito alto: o adolescente precisa perceber relevância e desafio, não apenas “curso que os pais escolheram”.', perfilFamiliar: 'Família compara opções presenciais com cursos online e quer evidências de resultado.', classeAbepEstimativa: 'A/B/C alta', motivacoes: ['Transformar interesse por tecnologia em habilidade real', 'Preparação para futuro profissional', 'Projetos para portfólio'], doresEObjecoes: ['Compara preço com curso online', 'Quer ver conteúdo avançado', 'Deslocamento'], canaisPreferidos: ['Google', 'WhatsApp', 'YouTube/Instagram'], disponibilidadeDeCompra: 'Média a alta quando entende a diferença entre acompanhamento presencial e conteúdo solto online.', gatilhosDeDecisao: ['Projetos reais', 'IA, games e programação', 'Professor que conversa bem com adolescente'], mensagemRecomendada: 'Do interesse por games e IA para projetos reais em tecnologia, com orientação presencial e trilha clara.'
-    },
-    {
-      nomeFicticio: 'Fernanda e Sofia, 6 anos', idade: 'Mãe de 34–42 anos', filhoIdade: '6 anos', filhoPerfil: 'Criança em fase inicial, precisa de acolhimento, lúdico e atividades concretas.', papelDoFilhoNaDecisao: 'Alto: a criança decide pela experiência emocional, acolhimento e diversão.', perfilFamiliar: 'Busca primeira atividade tecnológica sem excesso de tela.', classeAbepEstimativa: 'A/B/C alta', motivacoes: ['Coordenação motora', 'Organização mental', 'Criatividade', 'Primeiro contato positivo com tecnologia'], doresEObjecoes: ['Acha que pode ser cedo demais', 'Preocupação com frustração', 'Medo de parecer aula escolar'], canaisPreferidos: ['Instagram', 'WhatsApp', 'Indicação escolar'], disponibilidadeDeCompra: 'Alta com abordagem lúdica e explicação de desenvolvimento por idade.', gatilhosDeDecisao: ['Ambiente acolhedor', 'Atividade mão na massa', 'Comunicação de “sem tela passiva”'], mensagemRecomendada: 'Tecnologia para pequenos criadores: montar, imaginar e aprender brincando.'
-    },
-    {
-      nomeFicticio: 'Carlos e João, 10 anos', idade: 'Pai/mãe de 40–50 anos', filhoIdade: '10 anos', filhoPerfil: 'Criança competitiva, gosta de desafios, robôs, campeonatos e reconhecimento.', papelDoFilhoNaDecisao: 'Muito alto: ele quer desafio, ranking, conquista e algo para mostrar.', perfilFamiliar: 'Valoriza atividade que desenvolva foco, persistência e solução de problemas.', classeAbepEstimativa: 'A/B/C alta', motivacoes: ['Autonomia', 'Raciocínio lógico', 'Confiança', 'Participação em desafios'], doresEObjecoes: ['Concorrência com esporte', 'Horários', 'Preço versus outras atividades'], canaisPreferidos: ['WhatsApp', 'Eventos', 'Instagram'], disponibilidadeDeCompra: 'Alta quando percebe desafio prático e evolução mensurável.', gatilhosDeDecisao: ['Robocopa/desafios', 'Demonstração de robôs', 'Certificado ou projeto concluído'], mensagemRecomendada: 'Para crianças que gostam de desafio: robótica e programação com projetos que saem do papel.'
-    },
-    {
-      nomeFicticio: 'Ana e Bia, 15 anos', idade: 'Responsável de 39–50 anos', filhoIdade: '15 anos', filhoPerfil: 'Adolescente criativa, interessada em design, conteúdo, apps, IA e possibilidades de carreira.', papelDoFilhoNaDecisao: 'Decisivo: precisa ver utilidade real, autonomia e conexão com seus interesses.', perfilFamiliar: 'Busca algo que una criatividade, tecnologia e futuro profissional.', classeAbepEstimativa: 'A/B/C alta', motivacoes: ['Portfólio', 'Criatividade', 'IA aplicada', 'Primeiras habilidades profissionais'], doresEObjecoes: ['Medo de curso infantilizado', 'Preferência por online', 'Agenda com escola/vestibular'], canaisPreferidos: ['Instagram', 'Google', 'WhatsApp'], disponibilidadeDeCompra: 'Média a alta se a comunicação mostrar projetos maduros e aplicáveis.', gatilhosDeDecisao: ['Exemplos de apps', 'IA na prática', 'Projetos visuais e autorais'], mensagemRecomendada: 'Tecnologia para criar: apps, IA e projetos digitais com aplicação real.'
-    },
-    {
-      nomeFicticio: 'Patrícia e Gabriel, 11 anos', idade: 'Mãe de 36–48 anos', filhoIdade: '11 anos', filhoPerfil: 'Criança tímida ou neurodivergente, com forte interesse específico em tecnologia ou construção.', papelDoFilhoNaDecisao: 'Alto, mas depende de segurança emocional e acolhimento no ambiente.', perfilFamiliar: 'Procura uma atividade estruturada, acolhedora e respeitosa ao ritmo da criança.', classeAbepEstimativa: 'A/B/C alta', motivacoes: ['Autoconfiança', 'Socialização gradual', 'Interesse por tecnologia', 'Ambiente seguro'], doresEObjecoes: ['Medo de não adaptação', 'Experiências anteriores ruins', 'Preocupação com turma e professor'], canaisPreferidos: ['WhatsApp', 'Indicação', 'Instagram'], disponibilidadeDeCompra: 'Alta quando o atendimento demonstra escuta, respeito ao ritmo e clareza de acompanhamento.', gatilhosDeDecisao: ['Aula experimental cuidadosa', 'Turma adequada', 'Comunicação empática'], mensagemRecomendada: 'Um espaço para aprender tecnologia com acolhimento, ritmo e projetos que valorizam o jeito de cada criança.'
-    }
+    persona({
+      nome: 'Cliente de proximidade',
+      decisor: 'Morador ou comprador frequente da região',
+      perfil: `Busca uma opção confiável de ${segment} perto de ${topBairro}, com atendimento rápido e boa reputação local.`,
+      motivacoes: ['Conveniência', 'Confiança no atendimento', 'Boa relação custo-benefício'],
+      dores: ['Pouco tempo para comparar opções', 'Receio de atendimento ruim', 'Sensibilidade a preço e prazo'],
+      canais: ['Google', 'WhatsApp', 'Indicação local'],
+      gatilhos: ['Avaliações positivas', 'Resposta rápida', 'Localização conveniente'],
+      mensagem: `Uma opção confiável de ${segment} perto de você, com atendimento claro e solução sem complicação.`
+    }),
+    persona({
+      nome: 'Comprador comparador',
+      decisor: 'Pessoa que pesquisa antes de comprar',
+      perfil: `Compara concorrentes de ${segment}, avaliações, preço, qualidade percebida e provas de resultado antes de decidir.`,
+      motivacoes: ['Reduzir risco de escolha', 'Encontrar melhor valor percebido', 'Ver evidências antes do contato'],
+      dores: ['Informação incompleta', 'Promessas genéricas', 'Dúvida entre opções parecidas'],
+      canais: ['Google', 'Instagram', 'Sites de avaliação'],
+      gatilhos: ['Prova social', 'Portfólio ou casos reais', 'Oferta bem explicada'],
+      mensagem: 'Compare com segurança: veja diferenciais, avaliações e o que torna a oferta mais adequada para sua necessidade.'
+    }),
+    persona({
+      nome: 'Cliente com urgência',
+      decisor: 'Comprador orientado por prazo',
+      perfil: `Precisa resolver uma demanda de ${segment} rapidamente e tende a escolher quem responde primeiro com clareza.`,
+      motivacoes: ['Rapidez', 'Disponibilidade', 'Baixo atrito no contato'],
+      dores: ['Demora no retorno', 'Falta de agenda ou estoque', 'Processo de compra confuso'],
+      canais: ['WhatsApp', 'Google Maps', 'Telefone'],
+      gatilhos: ['Chamada direta', 'Confirmação de disponibilidade', 'Orçamento simples'],
+      mensagem: 'Atendimento ágil para resolver sua necessidade hoje, com clareza de preço, prazo e próximos passos.'
+    }),
+    persona({
+      nome: 'Parceiro ou influenciador local',
+      decisor: 'Empresa, profissional ou liderança regional',
+      perfil: `Pode indicar clientes ou formar parceria complementar no entorno de ${topBairro}.`,
+      motivacoes: ['Ganhar relevância local', 'Gerar indicações mútuas', 'Criar ofertas combinadas'],
+      dores: ['Falta de parceiros confiáveis', 'Pouco tempo para ações locais', 'Dificuldade de mensurar retorno'],
+      canais: ['Networking local', 'LinkedIn', 'WhatsApp'],
+      gatilhos: ['Proposta de parceria simples', 'Benefício mútuo', 'Ação piloto de baixo risco'],
+      mensagem: 'Vamos testar uma parceria local simples, com indicação mútua e medição objetiva de retorno.'
+    })
   ];
 }
 
@@ -243,8 +296,8 @@ export async function runMarketAnalysis(input: {
   });
   const neighborhoodScores = groupByNeighborhood({ points, places: strategicPlaces, unidade: input.unidade, unitLat: unitGeo.lat, unitLng: unitGeo.lng, radiusKm: analysisRadiusKm });
   const distances = points.map((p) => p.distanciaLinhaRetaKm);
-  const directCount = strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
-  const indirectCount = strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
+  const directCount = strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente direto' || p.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
+  const indirectCount = strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente indireto' || p.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
   const opportunity = clamp(70 + (points.length ? points.length * 2 : 4) - directCount * 4 - indirectCount * 0.7 + (neighborhoodScores[0]?.score || 0) / 4);
   const fase = directCount <= 2 ? 'Mercado com Lacuna' : directCount <= 8 ? 'Mercado em Crescimento' : directCount <= 18 ? 'Mercado Maduro' : 'Mercado Saturado';
 
@@ -288,22 +341,22 @@ export async function runMarketAnalysis(input: {
       forcasAtuais: [
         `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com CNAE principal ${input.unidade.cnaePrincipalCodigo} — ${input.unidade.cnaePrincipalDescricao}.`,
         'A análise considera a região real da unidade detectada pelo CNPJ, e não um território genérico.',
-        'Aula experimental, atendimento consultivo e demonstração prática continuam sendo ativos importantes para conversão.'
+        'Atendimento consultivo, prova social, clareza de oferta e conveniência local são ativos importantes para conversão.'
       ],
       diferenciaisFrenteConcorrentes: [
-        `Frente aos concorrentes mapeados em até ${analysisRadiusKm} km, a unidade deve destacar projetos práticos, tecnologia aplicada e trilha por idade.`,
-        'Quando competir com esportes, idiomas e artes, posicionar tecnologia como complemento de futuro e não apenas mais uma atividade.',
-        'Quando competir com escolas de tecnologia, reforçar acompanhamento presencial, projeto concluído e clareza da evolução do aluno.'
+        `Frente aos concorrentes mapeados em até ${analysisRadiusKm} km, a unidade deve destacar qualidade, reputação, conveniência, preço percebido e velocidade de atendimento.`,
+        'Quando competir com alternativas indiretas, posicionar a oferta pelo problema que resolve melhor e não apenas pela categoria do serviço.',
+        'Quando competir com redes ou negócios bem avaliados, reforçar diferenciais locais, atendimento humano e provas concretas.'
       ],
       riscosDePosicionamento: [
-        'Concorrentes com muitas avaliações no Google podem transmitir confiança inicial maior; usar prova social local e aula experimental para reduzir esse risco.',
-        'Se houver muita oferta extracurricular na região, a objeção principal pode ser agenda, não interesse.',
-        'Famílias podem comparar preço se o atendimento não mostrar valor antes da proposta comercial.'
+        'Concorrentes com muitas avaliações no Google podem transmitir confiança inicial maior; usar prova social local para reduzir esse risco.',
+        'Se houver muita oferta similar na região, a objeção principal pode ser diferenciação, conveniência ou preço.',
+        'Clientes podem comparar preço se o atendimento não mostrar valor antes da proposta comercial.'
       ],
       mensagensRecomendadas: [
-        `Para famílias de ${topBairro}: tecnologia como criação, raciocínio lógico e preparo para o futuro.`,
-        'Aula experimental para identificar a trilha ideal por idade, maturidade e interesse da criança ou adolescente.',
-        'Menos tela passiva, mais construção, projeto e autonomia.'
+        `Para clientes de ${topBairro}: solução local confiável, com atendimento claro e resposta rápida.`,
+        'Explique a oferta em termos de problema resolvido, prazo, qualidade, preço percebido e prova social.',
+        'Mostre diferenciais concretos antes de pedir a decisão de compra.'
       ],
       ajustesIncrementaisSugeridos: [
         `Testar campanha local em ${topBairro} e bairros próximos antes de ampliar verba.`,
@@ -311,17 +364,17 @@ export async function runMarketAnalysis(input: {
         'Criar respostas comerciais citando diferenciais frente aos tipos de concorrentes selecionados.'
       ],
       hipotesesParaTestar: [
-        `Bairros com maior score no raio de ${analysisRadiusKm} km tendem a gerar mais agendamentos de aula experimental.`,
-        'Mensagens com projetos práticos convertem melhor que mensagens genéricas sobre futuro.',
-        'Pais decidem melhor quando o filho participa da experiência e aprova a atividade.'
+        `Bairros com maior score no raio de ${analysisRadiusKm} km tendem a gerar mais leads qualificados.`,
+        'Mensagens com prova social e benefício concreto convertem melhor que mensagens genéricas.',
+        'Clientes avançam mais rápido quando recebem preço, prazo e diferenciais de forma objetiva.'
       ]
     },
     personas: buildPersonas(input.unidade, topBairro),
     evolucaoIncremental: {
-      manter: ['WhatsApp como principal canal de conversão.', 'Aula experimental como porta de entrada consultiva.', 'Comunicação centrada em tecnologia como desenvolvimento de futuro.'],
-      melhorar: [`Segmentação por bairros dentro do raio de ${analysisRadiusKm} km.`, 'Scripts de objeção por idade, bairro e tipo de concorrente.', 'Mensuração de leads por origem geográfica e por concorrente citado.'],
+      manter: ['WhatsApp ou canal direto como principal ponto de conversão.', 'Atendimento consultivo como porta de entrada.', 'Comunicação centrada no problema que o negócio resolve.'],
+      melhorar: [`Segmentação por bairros dentro do raio de ${analysisRadiusKm} km.`, 'Scripts de objeção por perfil de cliente, bairro e tipo de concorrente.', 'Mensuração de leads por origem geográfica e por concorrente citado.'],
       adicionar: ['Ranking de bairros prioritários para campanhas locais.', 'Lista de concorrentes com avaliação Google para comparação comercial.', 'Campo de objeções no follow-up para validar barreiras regionais.'],
-      testarAntesDeAlterar: ['Campanhas por raio nos bairros com maior afinidade.', 'Mensagens específicas para pais de crianças versus adolescentes.', 'Ofertas pontuais para bairros com maior distância da unidade.'],
+      testarAntesDeAlterar: ['Campanhas por raio nos bairros com maior afinidade.', 'Mensagens específicas por intenção de compra e nível de urgência.', 'Ofertas pontuais para bairros com maior distância da unidade.'],
       fazerSemPrejudicarOperacao: ['Usar os dados como camada de decisão semanal, sem trocar a operação comercial atual.', 'Aplicar testes pequenos antes de mudar investimento, preços ou formato de oferta.']
     },
     diagnosticoFontesPublicas: [
@@ -333,16 +386,14 @@ export async function runMarketAnalysis(input: {
       'Censo 2022 pode enriquecer a análise, mas exige ETL com setor censitário, malha territorial e cruzamento geográfico.'
     ],
     planoDeAcao: [
-      { prioridade: 1, acao: `Priorizar os bairros com maior afinidade dentro de ${analysisRadiusKm} km para campanhas e follow-up ativo.`, tipo: 'Testar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '7 a 14 dias', custoEstimado: 'Baixo', recursoGratuitoConfirmado: false, responsavelSugerido: 'Comercial/Marketing', kpiParaMedirSucesso: 'Agendamentos de aula experimental por bairro' },
-      { prioridade: 2, acao: 'Criar argumento comercial comparando a unidade com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do WhatsApp para visita/aula experimental' },
-      { prioridade: 3, acao: 'Perguntar no atendimento se a criança ou adolescente já faz idioma, esporte, reforço ou escola integral.', tipo: 'Adicionar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Atendimento', kpiParaMedirSucesso: 'Objeções registradas por lead e bairro' },
-      { prioridade: 4, acao: 'Criar mensagens diferentes para crianças 5–10, pré-adolescentes 11–14 e adolescentes 15–17.', tipo: 'Melhorar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '2 semanas', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing', kpiParaMedirSucesso: 'CTR e taxa de resposta por faixa etária' }
+      { prioridade: 1, acao: `Priorizar os bairros com maior afinidade dentro de ${analysisRadiusKm} km para campanhas e follow-up ativo.`, tipo: 'Testar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '7 a 14 dias', custoEstimado: 'Baixo', recursoGratuitoConfirmado: false, responsavelSugerido: 'Comercial/Marketing', kpiParaMedirSucesso: 'Leads qualificados por bairro' },
+      { prioridade: 2, acao: 'Criar argumento comercial comparando a unidade com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },
+      { prioridade: 3, acao: 'Registrar no atendimento quais alternativas o cliente está comparando e qual objeção pesa mais.', tipo: 'Adicionar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Atendimento', kpiParaMedirSucesso: 'Objeções registradas por lead e bairro' },
+      { prioridade: 4, acao: 'Criar mensagens diferentes para urgência, comparação de preço, busca por qualidade e conveniência local.', tipo: 'Melhorar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '2 semanas', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing', kpiParaMedirSucesso: 'CTR e taxa de resposta por segmento de mensagem' }
     ],
     proximaRevisaoRecomendada: new Date(today.getTime() + reviewDays * 24 * 60 * 60 * 1000).toISOString(),
     iaAviso: process.env.OPENAI_API_KEY ? undefined : 'A análise com IA avançada não foi executada porque a chave OpenAI não está configurada. O relatório usa regras locais, Google Places e dados públicos disponíveis.'
   };
-  result.posicionamentoMyRobot = result.posicionamentoUnidade;
-
   const aiEnhancement = await enhanceWithOpenAI(result);
   const finalResult: AnalysisResult = aiEnhancement
     ? { ...result, ...aiEnhancement, posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || result.posicionamentoUnidade, iaAviso: undefined }

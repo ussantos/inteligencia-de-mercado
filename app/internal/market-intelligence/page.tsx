@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { MarketIntelligenceApp } from '@/components/MarketIntelligenceApp';
 
 export const metadata: Metadata = {
-  title: 'Inteligência de Mercado | My Robot',
+  title: 'Inteligência de Mercado',
   robots: {
     index: false,
     follow: false

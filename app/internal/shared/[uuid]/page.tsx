@@ -18,7 +18,7 @@ export default async function SharedAnalysisPage({ params }: { params: Promise<{
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 rounded-3xl bg-white p-5 shadow-sm">
           <p className="text-sm font-semibold text-orange-600">Relatório compartilhado</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Inteligência de Mercado — My Robot</h1>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">Inteligência de Mercado</h1>
           <p className="mt-2 text-sm text-slate-500">Link somente leitura com validade limitada.</p>
         </div>
         <Dashboard result={link.reportJson as unknown as AnalysisResult} readOnly />

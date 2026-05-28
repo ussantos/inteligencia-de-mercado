@@ -1,0 +1,48 @@
+# Plano Azure - Inteligencia de Mercado
+
+Status: Alteracoes aplicadas. Validacao completa bloqueada por falha de instalacao de dependencias no npm local.
+
+## Objetivo
+
+Modernizar o projeto existente para ser uma aplicacao independente de inteligencia de mercado, preparada para Azure Static Web Apps, sem dependencia de marca, site ou dominio da My Robot.
+
+## Diagnostico do projeto
+
+- Aplicacao Next.js 15 com App Router, rotas API, Clerk, Prisma, Neon/Postgres, Azure Blob Storage e Leaflet.
+- Ja existe `staticwebapp.config.json` com runtime Node 22 para APIs.
+- A busca de concorrentes usa `services/google-places.ts`, mas existe codigo legado de Overpass.
+- O README e textos do produto ainda citam My Robot, robotica, tecnologia infantil e dominio `myrobotbarra.com.br`.
+- Provavel causa da falha atual de concorrentes: quando nao ha chave Google, o servico grava cache vazio por 30 dias e reutiliza esse resultado mesmo depois que a chave e configurada.
+
+## Alteracoes planejadas
+
+1. Atualizar identidade, metadata, textos de interface, exportacoes e README para "Inteligencia de Mercado" generico.
+2. Manter Azure Static Web Apps como alvo independente, sem subdominio ou acoplamento ao site da My Robot.
+3. Corrigir Google Places para nao armazenar cache vazio quando a chave nao estiver configurada e para filtrar resultados pelo raio analisado.
+4. Generalizar categorias de concorrentes e textos analiticos para qualquer tipo de negocio.
+5. Ajustar prompt de IA para inteligencia de mercado B2B/B2C generica.
+6. Criar `.env.example` sem segredos reais.
+7. Validar com typecheck/build quando possivel.
+
+## Seguranca e segredos
+
+- Nenhum token informado pelo usuario sera gravado no repositorio.
+- Variaveis sensiveis devem ser configuradas localmente em `.env.local` e no portal/segredos do Azure Static Web Apps.
+
+## Servicos Azure
+
+- Azure Static Web Apps para hospedagem do Next.js.
+- Azure Blob Storage opcional para upload temporario.
+- Banco Postgres externo existente via `DATABASE_URL`.
+
+## Validacao
+
+- `npm run typecheck`
+- `npm run build`
+
+Resultado local:
+
+- `git diff --check`: sem erros de whitespace.
+- Busca por segredos reais no repositorio: nenhum token informado pelo usuario foi encontrado.
+- `npm install`/`npm ci`: bloqueado por timeouts do gateway de pacotes e erro interno do npm `Exit handler never called`.
+- `tsc --noEmit`: nao concluiu porque a instalacao parcial ficou sem varios pacotes `@types`; o `node_modules` parcial foi removido.

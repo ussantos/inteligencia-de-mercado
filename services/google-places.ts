@@ -34,10 +34,11 @@ function normalizeText(value: string) {
 }
 
 function categoryFromHint(hint: CompetitorTypeConfig['strategicCategoryHint']): CategoriaEstrategica {
-  if (hint === 'direto') return 'Concorrente direto de tecnologia';
-  if (hint === 'barreira') return 'Barreira potencial de agenda';
+  if (hint === 'direto') return 'Concorrente direto';
+  if (hint === 'barreira') return 'Barreira de acesso ou conveniência';
   if (hint === 'polo') return 'Polo gerador de público';
-  return 'Concorrente indireto extracurricular';
+  if (hint === 'parceria') return 'Oportunidade de parceria';
+  return 'Concorrente indireto';
 }
 
 function extractBairro(address?: string) {
@@ -51,22 +52,24 @@ function classifyByGoogleTypes(types: string[] | undefined, fallback: Competitor
   const joined = (types || []).join(' ');
   if (/school|primary_school|secondary_school|preschool/i.test(joined) && fallback.strategicCategoryHint === 'barreira') {
     return {
-      categoria: 'Barreira potencial de agenda',
+      categoria: 'Barreira de acesso ou conveniência',
       subcategoria: fallback.type,
-      observacao: 'O Google Places indica uma escola ou instituição escolar. Pode reduzir disponibilidade da criança se houver contraturno ou horário integral; validar no atendimento.'
+      observacao: 'O Google Places indica uma instituição que pode influenciar fluxo, conveniência ou competição por atenção na região. Validar impacto antes de ajustar a estratégia.'
     };
   }
   const categoria = categoryFromHint(fallback.strategicCategoryHint);
   return {
     categoria,
     subcategoria: fallback.type,
-    observacao: categoria === 'Concorrente direto de tecnologia'
-      ? 'Encontrado no Google Places como possÃ­vel oferta concorrente ou substituta em tecnologia, programação, robótica, games ou maker.'
+    observacao: categoria === 'Concorrente direto'
+      ? 'Encontrado no Google Places como possível concorrente direto ou oferta muito próxima ao segmento analisado.'
       : categoria === 'Polo gerador de público'
-        ? 'Local com potencial de concentração de famÃ­lias e oportunidade para ação local, parceria ou evento.'
-        : categoria === 'Barreira potencial de agenda'
-          ? 'Pode competir com a agenda da criança ou indicar rotina escolar intensa. Validar com leads reais antes de alterar a oferta.'
-          : 'Pode competir pelo tempo, atenção e orçamento familiar destinado a atividades extracurriculares.'
+        ? 'Local com potencial de concentração de público e oportunidade para ação local, parceria ou prospecção.'
+        : categoria === 'Barreira de acesso ou conveniência'
+          ? 'Pode afetar acesso, conveniência, fluxo ou decisão de compra. Validar com clientes reais antes de alterar a oferta.'
+          : categoria === 'Oportunidade de parceria'
+            ? 'Pode complementar a oferta e gerar parceria, indicação ou ação comercial conjunta.'
+            : 'Pode competir indiretamente por atenção, orçamento, conveniência ou ocasião de compra do público-alvo.'
   };
 }
 
@@ -132,6 +135,10 @@ function buildSearchJobs(input: {
 }): Array<{ query: string; config: CompetitorTypeConfig; competitorType: CompetitorType }> {
   const configs = getConfigsForCompetitorTypes(input.competitorTypes);
   const municipioUf = `${input.unidade.municipio} ${input.unidade.uf}`.trim();
+  const businessTerms = [
+    input.unidade.cnaePrincipalDescricao,
+    ...input.selectedCnaes.map((cnae) => cnae.descricao)
+  ].filter(Boolean).slice(0, 5);
   const cnaeTerms = input.selectedCnaes
     .map((cnae) => cnae.descricao)
     .filter(Boolean)
@@ -142,6 +149,9 @@ function buildSearchJobs(input: {
     const queries = config.googleQueries.slice(0, 2);
     for (const query of queries) {
       jobs.push({ query: `${query} ${municipioUf}`.trim(), config, competitorType: config.type });
+      for (const term of businessTerms.slice(0, 2)) {
+        jobs.push({ query: `${query} ${term} ${municipioUf}`.trim(), config, competitorType: config.type });
+      }
     }
   }
 
@@ -179,11 +189,6 @@ export async function getStrategicPlaces(input: {
 
   const key = apiKey();
   if (!key) {
-    await prisma.placesCache.upsert({
-      where: { cacheKey },
-      update: { resultsJson: [], cachedAt: new Date(), expiresAt: new Date(Date.now() + TTL_30_DAYS) },
-      create: { cacheKey, cep: input.center.cep, domain: selectedCnaes.map((cnae) => cnae.descricao).join(', '), searchType: 'google-places-sem-chave', resultsJson: [], expiresAt: new Date(Date.now() + TTL_30_DAYS) }
-    });
     return [];
   }
 
@@ -202,6 +207,8 @@ export async function getStrategicPlaces(input: {
       const lat = place.location?.latitude;
       const lng = place.location?.longitude;
       if (typeof lat !== 'number' || typeof lng !== 'number') continue;
+      const distanciaKm = Number(haversineKm(input.center, { lat, lng }).toFixed(2));
+      if (distanciaKm > radiusM / 1000) continue;
       const dedupKey = place.id || `${normalizedName}:${lat.toFixed(5)}:${lng.toFixed(5)}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
@@ -223,7 +230,7 @@ export async function getStrategicPlaces(input: {
         website: place.websiteUri,
         telefone: place.nationalPhoneNumber,
         horarioFuncionamento: place.regularOpeningHours?.weekdayDescriptions?.join(' · '),
-        distanciaKm: Number(haversineKm(input.center, { lat, lng }).toFixed(2)),
+        distanciaKm,
         rating,
         userRatingCount,
         confiabilidade: rating && userRatingCount && userRatingCount >= 5 ? 'Alta' : 'Média',
@@ -234,7 +241,7 @@ export async function getStrategicPlaces(input: {
 
   const sorted = places
     .sort((a, b) => {
-      const weight = (item: StrategicPlace) => item.categoriaEstrategica === 'Concorrente direto de tecnologia' ? 0 : item.categoriaEstrategica === 'Concorrente indireto extracurricular' ? 1 : item.categoriaEstrategica === 'Barreira potencial de agenda' ? 2 : 3;
+      const weight = (item: StrategicPlace) => item.categoriaEstrategica === 'Concorrente direto' || item.categoriaEstrategica === 'Concorrente direto de tecnologia' ? 0 : item.categoriaEstrategica === 'Concorrente indireto' || item.categoriaEstrategica === 'Concorrente indireto extracurricular' ? 1 : item.categoriaEstrategica === 'Barreira de acesso ou conveniência' || item.categoriaEstrategica === 'Barreira potencial de agenda' ? 2 : 3;
       return weight(a) - weight(b) || (b.rating || 0) - (a.rating || 0) || (a.distanciaKm || 0) - (b.distanciaKm || 0);
     })
     .slice(0, 200);

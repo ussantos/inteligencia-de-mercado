@@ -4,8 +4,8 @@ import { ptBR } from '@clerk/localizations';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Inteligência de Mercado | My Robot',
-  description: 'Ferramenta interna de inteligência de mercado para cursos extracurriculares de tecnologia.',
+  title: 'Inteligência de Mercado',
+  description: 'Ferramenta independente de análise regional, concorrência e oportunidade para qualquer tipo de negócio.',
   robots: {
     index: false,
     follow: false

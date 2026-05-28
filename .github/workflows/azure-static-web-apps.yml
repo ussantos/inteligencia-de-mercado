@@ -1,4 +1,4 @@
-﻿name: Deploy Azure Static Web Apps - inteligencia
+﻿name: Deploy Azure Static Web Apps - inteligencia-de-mercado
 
 on:
   push:

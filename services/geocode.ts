@@ -80,7 +80,7 @@ export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
     await waitNominatimSlot();
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=br`;
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'inteligencia-myrobot/1.0 contato@myrobotbarra.com.br' }
+      headers: { 'User-Agent': 'inteligencia-de-mercado/1.0' }
     });
     if (response.ok) {
       const json = (await response.json()) as Array<{ lat: string; lon: string }>;

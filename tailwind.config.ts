@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        myrobot: {
+        market: {
           orange: '#f97316',
           dark: '#0f172a',
           blue: '#2563eb'
