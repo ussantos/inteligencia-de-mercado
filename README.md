@@ -4,6 +4,8 @@ Aplicacao web independente para analise regional de concorrencia, oportunidades,
 
 A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um repositorio GitHub privado ou publico configurado no ambiente de deploy.
 
+Você pode testar a aplicação nesta URL: https://gray-glacier-0dc52610f.7.azurestaticapps.net/sign-in
+
 ## Proposito
 
 A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da empresa, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
