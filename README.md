@@ -29,6 +29,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 ## Rotas
 
 - `/` abre a aplicacao principal.
+- `/sign-in` abre a tela de login do Clerk.
 - `/internal/market-intelligence` redireciona para `/` por compatibilidade com links antigos.
 - `/internal/shared/[uuid]` abre relatorios compartilhados em modo somente leitura.
 - `/api/analyze` executa a analise.
@@ -36,6 +37,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - `/api/history` lista historico do usuario.
 - `/api/share` gera link compartilhavel.
 - `/api/blob/sas` gera SAS temporario para upload.
+- `/.swa/health.html` e uma rota tecnica usada pelo Azure Static Web Apps para validar o deploy. O middleware nao deve bloquear esse caminho.
 
 ## Arquitetura
 
@@ -46,6 +48,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Storage opcional: Azure Blob Storage para uploads temporarios.
 - Deploy: Azure Static Web Apps com GitHub Actions.
 - Runtime API no Azure: Node 22.
+- Saida Next.js: `standalone`, para reduzir o pacote dinamico publicado como Function gerenciada pelo Azure Static Web Apps.
 
 ## Leitura do codigo
 
@@ -77,14 +80,24 @@ app_build_command: "npm run build"
 O build executa:
 
 ```bash
-prisma generate && next build
+prisma generate && next build && node scripts/prepare-standalone.js
 ```
 
-O `staticwebapp.config.json` define headers de seguranca, noindex, redirect de 401 para `/sign-in` e runtime `node:22`.
+O `staticwebapp.config.json` define headers de seguranca, noindex, redirect de 401 para `/sign-in` e runtime `node:22`. O `next.config.js` usa `output: 'standalone'`, e o script `scripts/prepare-standalone.js` copia os arquivos estaticos necessarios para dentro do pacote gerado pelo Next.
+
+Existe apenas um workflow ativo para deploy:
+
+```text
+.github/workflows/azure-static-web-apps.yml
+```
+
+Nao crie outro workflow automatico para a mesma Static Web App, pois dois workflows disparados no mesmo `push` podem publicar artefatos diferentes e confundir a analise de falhas.
 
 ## Variaveis de ambiente
 
 Veja `.env.example`. Nunca commite `.env`, `.env.local`, tokens, connection strings ou URLs de banco com senha.
+
+O arquivo `.npmrc` do repositorio aponta para o registry publico do npm e desativa audit/fund/progress no CI para reduzir ruido e travamentos durante o build do Azure/Oryx.
 
 Obrigatorias para a aplicacao principal:
 
@@ -135,7 +148,7 @@ Se os concorrentes nao aparecerem, verifique:
 ## Rodar localmente
 
 ```powershell
-npm install
+npm ci
 Copy-Item .env.example .env.local
 notepad .env.local
 npx prisma generate
@@ -214,7 +227,16 @@ Isso e esperado. A rota principal `/` e protegida pelo Clerk.
 
 ### Erro de Prisma no build
 
-Confirme que o build executa `prisma generate && next build` e que `DATABASE_URL` esta configurada no GitHub Actions/Azure.
+Confirme que o build executa `prisma generate && next build && node scripts/prepare-standalone.js` e que `DATABASE_URL` esta configurada no GitHub Actions/Azure.
+
+### Falha ao publicar Azure Functions
+
+Em apps Next.js hibridos, o Azure Static Web Apps empacota a parte dinamica como Function gerenciada. Se a publicacao falhar nessa etapa, verifique:
+
+- `next.config.js` contem `output: 'standalone'`.
+- O build executa `scripts/prepare-standalone.js` depois de `next build`.
+- O middleware nao bloqueia `/.swa/health.html`.
+- Existe apenas um workflow de deploy ativo em `.github/workflows`.
 
 ### Upload temporario falha
 
