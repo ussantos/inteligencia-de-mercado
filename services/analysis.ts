@@ -348,7 +348,7 @@ export async function runMarketAnalysis(input: {
   const reviewDays = fase === 'Mercado com Lacuna' ? 30 : fase === 'Mercado em Crescimento' ? 60 : fase === 'Mercado Maduro' ? 90 : 45;
   const unitName = input.unidade.nomeFantasia || input.unidade.razaoSocial;
   const topBairro = neighborhoodScores[0]?.bairro || input.unidade.bairro;
-  const hasGoogleKey = Boolean(process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY);
+  const hasGoogleKey = Boolean(process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY);
 
   const result: AnalysisResult = {
     createdAt: today.toISOString(),
@@ -421,7 +421,7 @@ export async function runMarketAnalysis(input: {
     },
     diagnosticoFontesPublicas: [
       ...strategicPlacesResult.diagnostics,
-      hasGoogleKey ? 'Google Places está configurado para mapear concorrentes, avaliações, quantidade de avaliações e dados públicos dos locais no raio definido.' : 'Google Places não foi executado porque GOOGLE_PLACES_API_KEY, GOOGLE_MAPS_SERVER_API_KEY ou NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY não está configurada.',
+      hasGoogleKey ? 'Google Places está configurado para mapear concorrentes, avaliações, quantidade de avaliações e dados públicos dos locais no raio definido.' : 'Google Places não foi executado porque GOOGLE_MAPS_SERVER_API_KEY ou GOOGLE_PLACES_API_KEY não está configurada.',
       'ViaCEP resolve CEP para endereço/bairro/cidade, mas não traz renda.',
       'IBGE Localidades identifica município/UF, mas não traz renda por bairro.',
       'SIDRA exige tabela, variável, período, classificação e nível territorial; não é uma chamada genérica por CEP.',

@@ -90,13 +90,27 @@ function classifyByGoogleTypes(types: string[] | undefined, fallback: Competitor
 }
 
 function apiKey() {
-  // Preferimos a chave server-side, mas aceitamos os nomes alternativos usados no Azure/GitHub.
-  // O fallback NEXT_PUBLIC ajuda em ambientes onde a mesma chave publica foi cadastrada primeiro.
-  if (process.env.GOOGLE_PLACES_API_KEY) return { key: process.env.GOOGLE_PLACES_API_KEY, source: 'GOOGLE_PLACES_API_KEY' };
+  // Google Places roda no servidor do Azure, nao no navegador da pessoa.
+  // Por isso a chave precisa aceitar chamada server-side; chave com restricao de HTTP referrer da erro 403.
   if (process.env.GOOGLE_MAPS_SERVER_API_KEY) return { key: process.env.GOOGLE_MAPS_SERVER_API_KEY, source: 'GOOGLE_MAPS_SERVER_API_KEY' };
+  if (process.env.GOOGLE_PLACES_API_KEY) return { key: process.env.GOOGLE_PLACES_API_KEY, source: 'GOOGLE_PLACES_API_KEY' };
   if (process.env.GOOGLE_MAPS_API_KEY) return { key: process.env.GOOGLE_MAPS_API_KEY, source: 'GOOGLE_MAPS_API_KEY' };
-  if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY) return { key: process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY, source: 'NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY' };
   return { key: '', source: '' };
+}
+
+function explainGoogleError(status: number, rawBody: string) {
+  // O corpo do Google costuma vir em JSON, mas guardamos como texto porque o erro precisa aparecer no diagnostico.
+  // Quando a causa e conhecida, acrescentamos uma orientacao direta para quem vai corrigir no Google Cloud.
+  if (status === 403 && rawBody.includes('API_KEY_HTTP_REFERRER_BLOCKED')) {
+    return ' A chave usada pelo backend esta bloqueada por HTTP referrer. Crie/use uma chave de servidor para GOOGLE_MAPS_SERVER_API_KEY ou GOOGLE_PLACES_API_KEY, restrinja por API "Places API" e remova restricao de site/referrer nessa chave.';
+  }
+  if (status === 403 && rawBody.includes('API_KEY_SERVICE_BLOCKED')) {
+    return ' A chave nao tem permissao para a Places API. No Google Cloud, habilite a Places API para o projeto e permita essa API nas restricoes da chave.';
+  }
+  if (status === 403 && rawBody.includes('PERMISSION_DENIED')) {
+    return ' O Google negou a chamada. Verifique billing, Places API habilitada e restricoes da chave no Google Cloud.';
+  }
+  return '';
 }
 
 async function googleTextSearch(params: {
@@ -145,7 +159,7 @@ async function googleTextSearch(params: {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      const diagnostic = `Google Places retornou HTTP ${response.status} para "${params.query}". ${text.slice(0, 500)}`;
+      const diagnostic = `Google Places retornou HTTP ${response.status} para "${params.query}".${explainGoogleError(response.status, text)} ${text.slice(0, 500)}`;
       console.warn(diagnostic);
       return { places: [], diagnostic };
     }

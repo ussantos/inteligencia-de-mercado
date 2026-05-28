@@ -107,7 +107,7 @@ Obrigatorias para a aplicacao principal:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
 - `DATABASE_URL`
-- `GOOGLE_PLACES_API_KEY`
+- `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`
 
 Recomendadas para evitar loop de autenticacao em producao:
 
@@ -132,7 +132,6 @@ Opcionais:
 - `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
 
 Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
-- `GOOGLE_MAPS_SERVER_API_KEY`
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.
 
@@ -144,7 +143,9 @@ A busca de concorrentes usa a Places API nova:
 https://places.googleapis.com/v1/places:searchText
 ```
 
-A chave deve ser server-side em `GOOGLE_PLACES_API_KEY` ou `GOOGLE_MAPS_SERVER_API_KEY`. A aplicacao tambem aceita `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` como fallback, mas o recomendado e usar uma chave de servidor para o Google Places. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
+A chave deve ser server-side em `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`. A chave publica `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` serve para mapas no navegador e nao deve ser usada pelo backend para buscar concorrentes. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
+
+Se o diagnostico mostrar `API_KEY_HTTP_REFERRER_BLOCKED`, a chave usada no backend esta restrita por site/referrer. Crie uma chave separada para o servidor, permita a **Places API** nas restricoes de API e nao aplique restricao de HTTP referrer nessa chave. Depois cadastre essa chave no Azure Static Web Apps e nos secrets do GitHub como `GOOGLE_MAPS_SERVER_API_KEY` ou substitua `GOOGLE_PLACES_API_KEY`.
 
 A aplicacao nao grava cache vazio quando a chave Google esta ausente. Assim, depois que a chave e configurada, a proxima analise chama o Google Places de verdade.
 
@@ -153,6 +154,7 @@ Se os concorrentes nao aparecerem, verifique:
 - Places API habilitada no Google Cloud.
 - Billing ativo.
 - Restricoes da chave permitindo a Places API.
+- Chave de servidor sem restricao de HTTP referrer para `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`.
 - Cotas de uso.
 - Cache antigo em `PlacesCache` no banco.
 - `GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS` baixo demais.
