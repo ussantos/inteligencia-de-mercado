@@ -46,6 +46,7 @@ jobs:
           LOCATIONIQ_API_KEY: ${{ secrets.LOCATIONIQ_API_KEY }}
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
           GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
           GOOGLE_MAPS_SERVER_API_KEY: ${{ secrets.GOOGLE_MAPS_SERVER_API_KEY }}
           GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS: ${{ secrets.GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS }}

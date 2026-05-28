@@ -24,7 +24,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Busca de concorrentes e locais relevantes via Google Places API.
 - Mapa Leaflet com OpenStreetMap para visualizacao.
 - Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
-- Complemento opcional com OpenAI.
+- Complemento opcional com OpenAI para enriquecer posicionamento, evolucao incremental e plano de acao.
 - Exportacao PDF e XLSX no navegador.
 - Historico e compartilhamento de analises.
 - Autenticacao Clerk protegendo a aplicacao principal na raiz `/`.
@@ -130,6 +130,8 @@ Opcionais:
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+
+Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora a secao **Plano de Acao — Proximos Passos** com recomendacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
 - `GOOGLE_MAPS_SERVER_API_KEY`
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.

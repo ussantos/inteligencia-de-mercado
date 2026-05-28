@@ -411,7 +411,7 @@ export async function runMarketAnalysis(input: {
   };
   const aiEnhancement = await enhanceWithOpenAI(result);
   const finalResult: AnalysisResult = aiEnhancement
-    ? { ...result, ...aiEnhancement, posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || result.posicionamentoUnidade, iaAviso: undefined }
+    ? { ...result, ...aiEnhancement, posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || result.posicionamentoUnidade, iaAviso: 'Plano de ação e recomendações enriquecidos com IA a partir dos dados públicos, concorrentes, bairros, CNAEs e limitações encontradas.' }
     : result;
 
   const saved = await prisma.analysis.create({

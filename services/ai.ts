@@ -30,10 +30,15 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
     competitorTypes: base.competitorTypes,
     selectedCnaes: base.selectedCnaes,
     analysisRadiusKm: base.analysisRadiusKm,
+    faseMercadoLocal: base.faseMercadoLocal,
+    planoLocalInicial: base.planoDeAcao,
+    diagnosticoFontesPublicas: base.diagnosticoFontesPublicas,
     topBairros: base.afinidadePorBairro.slice(0, 10),
+    obstaculos: base.obstaculosMatricula.slice(0, 10),
     locais: base.strategicPlaces.slice(0, 40).map((place) => ({
       nome: place.nome,
       categoria: place.categoriaEstrategica,
+      subcategoria: place.subcategoria,
       distanciaKm: place.distanciaKm,
       rating: place.rating,
       avaliacoes: place.userRatingCount,
@@ -45,6 +50,15 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
 Você é especialista em inteligência de mercado para negócios B2B e B2C de diferentes setores.
 
 Gere uma complementação em PT-BR, sem substituir a operação atual da empresa analisada. Trabalhe com evolução incremental: manter, melhorar, adicionar, testar antes de alterar e fazer sem prejudicar a operação.
+
+Para o campo "planoDeAcao", aja como consultor executivo e entregue recomendações realmente acionáveis:
+- Crie de 6 a 8 ações priorizadas.
+- Use os bairros, concorrentes, avaliações, CNAEs, obstáculos e fase de mercado disponíveis.
+- Cada ação deve começar com verbo de comando e dizer o que fazer, onde fazer e por que fazer.
+- Evite conselhos genéricos como "melhorar marketing" sem canal, público, teste ou métrica.
+- Inclua pelo menos uma ação de curto prazo, uma de prova social/reputação, uma de campanha local, uma de abordagem comercial e uma de mensuração.
+- Se houver poucos dados do Google Places, deixe isso claro e proponha uma ação de validação manual.
+- Não invente nomes, números, avaliações ou bairros que não estejam nos dados.
 
 Responda APENAS JSON válido com os campos camelCase abaixo. Não invente dados estatísticos. Quando houver limitação, declare a limitação.
 
