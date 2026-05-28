@@ -6,7 +6,18 @@ import { SignIn } from '@clerk/nextjs';
 export default function SignInPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-10">
-      <div className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1fr_460px]">
+      <div className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[460px_1fr]">
+        <div className="w-full rounded-3xl bg-white p-8 text-center shadow-xl">
+          <p className="text-sm font-semibold text-orange-600">Inteligência de Mercado</p>
+          <h2 className="mt-2 text-3xl font-bold text-slate-900">Acesse a ferramenta</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            Entre para analisar concorrência, regiões, oportunidades e posicionamento de mercado.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <SignIn routing="path" path="/sign-in" forceRedirectUrl="/" />
+          </div>
+        </div>
+
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-950 shadow-xl">
           <div className="flex min-h-[520px] flex-col p-8">
             <div className="flex justify-center">
@@ -48,17 +59,6 @@ export default function SignInPage() {
             </a>
           </div>
         </section>
-
-        <div className="w-full rounded-3xl bg-white p-8 text-center shadow-xl">
-          <p className="text-sm font-semibold text-orange-600">Inteligência de Mercado</p>
-          <h2 className="mt-2 text-3xl font-bold text-slate-900">Acesse a ferramenta</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            Entre para analisar concorrência, regiões, oportunidades e posicionamento de mercado.
-          </p>
-          <div className="mt-8 flex justify-center">
-            <SignIn routing="path" path="/sign-in" forceRedirectUrl="/" />
-          </div>
-        </div>
       </div>
     </main>
   );
