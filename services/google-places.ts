@@ -33,6 +33,16 @@ interface GoogleSearchResponse {
   places?: GooglePlace[];
 }
 
+interface GoogleSearchResult {
+  places: GooglePlace[];
+  diagnostic?: string;
+}
+
+interface StrategicPlacesResult {
+  places: StrategicPlace[];
+  diagnostics: string[];
+}
+
 function normalizeText(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
@@ -80,7 +90,13 @@ function classifyByGoogleTypes(types: string[] | undefined, fallback: Competitor
 }
 
 function apiKey() {
-  return process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
+  // Preferimos a chave server-side, mas aceitamos os nomes alternativos usados no Azure/GitHub.
+  // O fallback NEXT_PUBLIC ajuda em ambientes onde a mesma chave publica foi cadastrada primeiro.
+  if (process.env.GOOGLE_PLACES_API_KEY) return { key: process.env.GOOGLE_PLACES_API_KEY, source: 'GOOGLE_PLACES_API_KEY' };
+  if (process.env.GOOGLE_MAPS_SERVER_API_KEY) return { key: process.env.GOOGLE_MAPS_SERVER_API_KEY, source: 'GOOGLE_MAPS_SERVER_API_KEY' };
+  if (process.env.GOOGLE_MAPS_API_KEY) return { key: process.env.GOOGLE_MAPS_API_KEY, source: 'GOOGLE_MAPS_API_KEY' };
+  if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY) return { key: process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY, source: 'NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY' };
+  return { key: '', source: '' };
 }
 
 async function googleTextSearch(params: {
@@ -88,11 +104,11 @@ async function googleTextSearch(params: {
   lat: number;
   lng: number;
   radiusM: number;
-}): Promise<GooglePlace[]> {
+}): Promise<GoogleSearchResult> {
   // Esta chamada vai para a API nova do Google Places.
   // Pedimos so os campos necessarios para economizar dados e deixar a resposta menor.
-  const key = apiKey();
-  if (!key) return [];
+  const { key } = apiKey();
+  if (!key) return { places: [], diagnostic: 'Google Places não foi chamado porque nenhuma chave foi encontrada no runtime.' };
 
   try {
     const response = await fetchWithTimeout(GOOGLE_TEXT_SEARCH_URL, {
@@ -129,15 +145,17 @@ async function googleTextSearch(params: {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      console.warn(`Google Places retornou HTTP ${response.status} para "${params.query}". ${text}`);
-      return [];
+      const diagnostic = `Google Places retornou HTTP ${response.status} para "${params.query}". ${text.slice(0, 500)}`;
+      console.warn(diagnostic);
+      return { places: [], diagnostic };
     }
 
     const json = (await response.json()) as GoogleSearchResponse;
-    return Array.isArray(json.places) ? json.places : [];
+    return { places: Array.isArray(json.places) ? json.places : [] };
   } catch (error) {
-    console.warn(`Google Places falhou para "${params.query}". ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    return [];
+    const diagnostic = `Google Places falhou para "${params.query}". ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
+    console.warn(diagnostic);
+    return { places: [], diagnostic };
   }
 }
 
@@ -192,7 +210,7 @@ export async function getStrategicPlaces(input: {
   competitorTypes?: CompetitorType[];
   selectedCnaes?: CnaeOption[];
   radiusKm?: number;
-}): Promise<StrategicPlace[]> {
+}): Promise<StrategicPlacesResult> {
   // Esta funcao coordena a busca de locais.
   // Primeiro tenta cache; se nao tiver cache e houver chave Google, chama a API e salva o resultado.
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
@@ -202,11 +220,16 @@ export async function getStrategicPlaces(input: {
   const typeKey = [...competitorTypes].sort().join('|');
   const cacheKey = `google:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}`;
   const cached = await prisma.placesCache.findFirst({ where: { cacheKey, expiresAt: { gt: new Date() } } });
-  if (cached) return cached.resultsJson as unknown as StrategicPlace[];
+  if (cached) {
+    const cachedPlaces = cached.resultsJson as unknown as StrategicPlace[];
+    if (Array.isArray(cachedPlaces) && cachedPlaces.length > 0) {
+      return { places: cachedPlaces, diagnostics: ['Google Places: resultados carregados do cache.'] };
+    }
+  }
 
-  const key = apiKey();
+  const { key, source } = apiKey();
   if (!key) {
-    return [];
+    return { places: [], diagnostics: ['Google Places não foi executado porque nenhuma variável de chave foi encontrada no runtime. Configure GOOGLE_PLACES_API_KEY ou GOOGLE_MAPS_SERVER_API_KEY.'] };
   }
 
   const maxSearches = Number(process.env.GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS || 24);
@@ -214,9 +237,12 @@ export async function getStrategicPlaces(input: {
   const ownNames = [input.unidade.razaoSocial, input.unidade.nomeFantasia].filter(Boolean).map((value) => normalizeText(String(value)));
   const seen = new Set<string>();
   const places: StrategicPlace[] = [];
+  const diagnostics: string[] = [`Google Places: usando ${source}, raio ${Math.round(radiusM / 1000)} km, ${jobs.length} busca(s).`];
 
   for (const job of jobs) {
-    const googlePlaces = await googleTextSearch({ query: job.query, lat: input.center.lat, lng: input.center.lng, radiusM });
+    const search = await googleTextSearch({ query: job.query, lat: input.center.lat, lng: input.center.lng, radiusM });
+    if (search.diagnostic && diagnostics.length < 8) diagnostics.push(search.diagnostic);
+    const googlePlaces = search.places;
     for (const place of googlePlaces) {
       const nome = place.displayName?.text || 'Local sem nome';
       const normalizedName = normalizeText(nome);
@@ -263,6 +289,11 @@ export async function getStrategicPlaces(input: {
     })
     .slice(0, 200);
 
+  if (!sorted.length) {
+    diagnostics.push('Google Places executou, mas não retornou locais aproveitáveis para os termos, raio e coordenadas desta análise. Nenhum resultado vazio foi gravado no cache.');
+    return { places: [], diagnostics };
+  }
+
   await prisma.placesCache.upsert({
     where: { cacheKey },
     update: { resultsJson: sorted as any, cachedAt: new Date(), expiresAt: new Date(Date.now() + TTL_30_DAYS) },
@@ -276,7 +307,8 @@ export async function getStrategicPlaces(input: {
     }
   });
 
-  return sorted;
+  diagnostics.push(`Google Places retornou ${sorted.length} local(is) relevante(s) depois de filtros de raio, duplicidade e nome da própria empresa.`);
+  return { places: sorted, diagnostics };
 }
 
 

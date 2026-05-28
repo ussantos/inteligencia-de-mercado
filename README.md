@@ -130,6 +130,7 @@ Opcionais:
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+- `GOOGLE_MAPS_SERVER_API_KEY`
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.
 
@@ -141,7 +142,7 @@ A busca de concorrentes usa a Places API nova:
 https://places.googleapis.com/v1/places:searchText
 ```
 
-A chave deve ser server-side em `GOOGLE_PLACES_API_KEY`. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
+A chave deve ser server-side em `GOOGLE_PLACES_API_KEY` ou `GOOGLE_MAPS_SERVER_API_KEY`. A aplicacao tambem aceita `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` como fallback, mas o recomendado e usar uma chave de servidor para o Google Places. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
 
 A aplicacao nao grava cache vazio quando a chave Google esta ausente. Assim, depois que a chave e configurada, a proxima analise chama o Google Places de verdade.
 
@@ -153,6 +154,7 @@ Se os concorrentes nao aparecerem, verifique:
 - Cotas de uso.
 - Cache antigo em `PlacesCache` no banco.
 - `GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS` baixo demais.
+- Resultado vazio antigo em `PlacesCache`. A aplicacao ignora caches vazios novos, mas registros antigos podem existir no banco.
 
 ## Rodar localmente
 
