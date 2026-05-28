@@ -1,7 +1,7 @@
 // Esta e a tela de entrada.
-// Ela mostra um botao do Clerk; o Clerk cuida de senha, email, sessao e redirecionamento.
+// Ela renderiza o formulario do Clerk dentro do proprio site, evitando ir para o Account Portal externo.
 // Depois do login, a pessoa volta para a raiz "/", onde fica a ferramenta.
-import { SignInButton } from '@clerk/nextjs';
+import { SignIn } from '@clerk/nextjs';
 
 export default function SignInPage() {
   return (
@@ -12,11 +12,9 @@ export default function SignInPage() {
         <p className="mt-3 text-sm leading-6 text-slate-500">
           Entre para analisar concorrência, regiões, oportunidades e posicionamento de mercado.
         </p>
-        <SignInButton mode="redirect" forceRedirectUrl="/">
-          <button className="mt-8 w-full rounded-2xl bg-orange-500 px-6 py-3 font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600">
-            Acessar ferramenta
-          </button>
-        </SignInButton>
+        <div className="mt-8 flex justify-center">
+          <SignIn routing="path" path="/sign-in" forceRedirectUrl="/" />
+        </div>
       </div>
     </main>
   );

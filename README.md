@@ -106,6 +106,12 @@ Obrigatorias para a aplicacao principal:
 - `DATABASE_URL`
 - `GOOGLE_PLACES_API_KEY`
 
+Recomendadas para evitar loop de autenticacao em producao:
+
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+
 Recomendadas:
 
 - `AZURE_STORAGE_CONNECTION_STRING`
