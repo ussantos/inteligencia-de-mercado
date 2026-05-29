@@ -77,6 +77,54 @@ function cnaeKey(cnae: CnaeOption) {
   return `${cnae.codigo}:${cnae.descricao}:${cnae.tipo}`;
 }
 
+function clampAnalysisRadius(value: number) {
+  // O servidor aceita no maximo 50 km.
+  // Esta funcao impede que a tela envie 830 km, texto vazio ou outro valor fora do limite.
+  if (!Number.isFinite(value)) return 8;
+  return Math.min(50, Math.max(1, Math.round(value)));
+}
+
+function normalizeText(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function inferCompetitorOptions(cnaes: CnaeOption[]): Array<{ type: CompetitorType; reason: string; suggested: boolean }> {
+  // A lista base continua sendo a mesma, mas a ordem e as dicas mudam conforme os CNAEs carregados.
+  // "Todos" permanece como padrao porque e a escolha mais segura para quem quer uma primeira analise ampla.
+  const text = normalizeText(cnaes.map((cnae) => `${cnae.codigo} ${cnae.descricao}`).join(' '));
+  const suggested = new Set<CompetitorType>(['Todos', 'Concorrentes diretos pelo CNAE', 'Concorrentes locais similares', 'Concorrentes bem avaliados no Google']);
+
+  if (/educa|ensino|trein|curso|idioma|informatica|escola|aula/.test(text)) {
+    ['Polos geradores de público', 'Negócios complementares para parceria', 'Marketplaces, delivery e canais digitais', 'Substitutos e alternativas de compra'].forEach((type) => suggested.add(type as CompetitorType));
+  } else if (/comerc|varej|loja|equipamento|livro|produto/.test(text)) {
+    ['Redes e franquias do setor', 'Marketplaces, delivery e canais digitais', 'Polos geradores de público', 'Negócios complementares para parceria'].forEach((type) => suggested.add(type as CompetitorType));
+  } else if (/saude|clinica|medic|odont|terap|estet/.test(text)) {
+    ['Prestadores autônomos e pequenos negócios', 'Barreiras de acesso e conveniência', 'Polos geradores de público'].forEach((type) => suggested.add(type as CompetitorType));
+  } else if (/servic|consult|manutenc|tecnic|profissional/.test(text)) {
+    ['Prestadores autônomos e pequenos negócios', 'Substitutos e alternativas de compra', 'Negócios complementares para parceria'].forEach((type) => suggested.add(type as CompetitorType));
+  } else {
+    ['Polos geradores de público', 'Negócios complementares para parceria'].forEach((type) => suggested.add(type as CompetitorType));
+  }
+
+  const reasons: Record<CompetitorType, string> = {
+    Todos: 'Recomendado para a primeira análise: combina CNAEs, segmento, concorrentes diretos, indiretos e locais relevantes.',
+    'Concorrentes diretos pelo CNAE': 'Usa os CNAEs selecionados para buscar empresas com oferta próxima à sua.',
+    'Concorrentes locais similares': 'Procura negócios parecidos na mesma região, mesmo quando o CNAE cadastrado é diferente.',
+    'Redes e franquias do setor': 'Ajuda a identificar marcas estruturadas que competem por preço, presença ou confiança.',
+    'Substitutos e alternativas de compra': 'Mapeia opções que resolvem o mesmo problema do cliente de outro jeito.',
+    'Prestadores autônomos e pequenos negócios': 'Encontra alternativas menores, profissionais independentes e ofertas de bairro.',
+    'Marketplaces, delivery e canais digitais': 'Considera concorrência online, aplicativos e canais digitais ligados ao segmento.',
+    'Polos geradores de público': 'Mostra locais que concentram pessoas e podem influenciar demanda, parcerias ou fluxo.',
+    'Negócios complementares para parceria': 'Busca empresas que podem indicar clientes, fazer ações conjuntas ou complementar a oferta.',
+    'Barreiras de acesso e conveniência': 'Avalia fatores de acesso, estacionamento, transporte e conveniência regional.',
+    'Concorrentes bem avaliados no Google': 'Prioriza negócios com boa reputação pública e muitas avaliações.'
+  };
+
+  return [...COMPETITOR_TYPES]
+    .map((type) => ({ type, reason: reasons[type], suggested: suggested.has(type) }))
+    .sort((a, b) => Number(!a.suggested) - Number(!b.suggested) || COMPETITOR_TYPES.indexOf(a.type) - COMPETITOR_TYPES.indexOf(b.type));
+}
+
 export function MarketIntelligenceApp() {
   // Estes estados sao como caixinhas de memoria da tela.
   // Cada caixinha guarda uma parte do formulario ou do resultado para o React redesenhar a tela quando algo muda.
@@ -99,6 +147,8 @@ export function MarketIntelligenceApp() {
   const [signingOut, setSigningOut] = useState(false);
 
   const allCnaes = useMemo(() => unidade?.cnaes?.length ? unidade.cnaes : unidade ? [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }] : [], [unidade]);
+  const competitorOptions = useMemo(() => inferCompetitorOptions(selectedCnaes.length ? selectedCnaes : allCnaes), [allCnaes, selectedCnaes]);
+  const safeAnalysisRadiusKm = clampAnalysisRadius(analysisRadiusKm);
   const canAnalyze = Boolean(unidade && selectedCnaes.length > 0 && competitorTypes.length > 0 && !loadingAnalysis);
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
 
@@ -200,14 +250,22 @@ export function MarketIntelligenceApp() {
     setCeps(parsed.ceps);
     setErrors(parsed.errors);
     setSensitiveWarning(parsed.sensitiveWarning);
+    if (parsed.ceps.length) {
+      setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s) no navegador. O upload da planilha é opcional; se o armazenamento temporário falhar, a análise continua usando estes CEPs.`);
+    }
 
     try {
       const sas = await fetch('/api/blob/sas', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ fileName: file.name }) });
       const data = await sas.json();
       if (!sas.ok) throw new Error(data.error);
       await fetch(data.sasUrl, { method: 'PUT', headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s) e arquivo temporário enviado com sucesso. A análise usará apenas os CEPs extraídos.`);
     } catch (error) {
-      setBlobWarning(error instanceof Error ? error.message : 'Upload temporário não executado. A análise seguirá usando os CEPs processados localmente.');
+      if (parsed.ceps.length) {
+        setBlobWarning('CEPs lidos com sucesso. O upload temporário ao Azure Blob não foi concluído, mas isso não impede a análise porque os CEPs já foram processados no navegador.');
+      } else {
+        setBlobWarning('O upload temporário não foi concluído. Verifique se o arquivo tem uma coluna chamada CEP e tente novamente; se a prévia de CEPs aparecer, a análise pode continuar.');
+      }
     }
   }
 
@@ -215,6 +273,8 @@ export function MarketIntelligenceApp() {
     // Aqui juntamos CNPJ, CNAEs, tipos de concorrentes, raio e CEPs.
     // O servidor recebe esse pacote e devolve o relatorio completo.
     if (!unidade) return;
+    const radiusKm = clampAnalysisRadius(analysisRadiusKm);
+    setAnalysisRadiusKm(radiusKm);
     setLoadingAnalysis(true);
     setGlobalError(null);
     try {
@@ -222,7 +282,7 @@ export function MarketIntelligenceApp() {
         method: 'POST',
         credentials: 'include',
         headers: await jsonAuthHeaders(),
-        body: JSON.stringify({ unidade, ceps: uniqueCeps, selectedCnaes, competitorTypes, analysisRadiusKm })
+        body: JSON.stringify({ unidade, ceps: uniqueCeps, selectedCnaes, competitorTypes, analysisRadiusKm: radiusKm })
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
@@ -313,29 +373,44 @@ export function MarketIntelligenceApp() {
 
             <Card>
               <Badge className="bg-slate-100 text-slate-600">3 — Tipos de concorrentes</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Selecione um ou mais tipos de concorrentes</h2>
-              <p className="mt-2 text-sm text-slate-500">“Todos” é o padrão e combina buscas pelo segmento, CNAE e categorias regionais. Para análises mais objetivas, selecione categorias específicas.</p>
+              <h2 className="mt-4 text-xl font-bold text-slate-900">Tipos de concorrentes sugeridos pelo CNAE</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                A ferramenta usa os CNAEs selecionados para destacar categorias mais prováveis para este segmento. Mantenha <strong>Todos</strong> marcado para uma primeira análise ampla, ou escolha categorias específicas para reduzir o foco.
+              </p>
+              {unidade ? (
+                <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm text-blue-900">
+                  Sugestões baseadas em: {selectedCnaes.length ? selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : unidade.cnaePrincipalDescricao}.
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">Carregue o CNPJ para receber sugestões de concorrentes ligadas aos CNAEs da empresa.</p>
+              )}
               <div className="mt-4 grid gap-2 md:grid-cols-2">
-                {COMPETITOR_TYPES.map((type) => <label key={type} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 text-sm hover:bg-slate-50"><input type="checkbox" checked={competitorTypes.includes(type)} onChange={() => toggleCompetitorType(type)} className="mt-1 h-4 w-4" /><span>{type}</span></label>)}
+                {competitorOptions.map((option) => <label key={option.type} className={`flex cursor-pointer gap-3 rounded-2xl border p-3 text-sm hover:bg-slate-50 ${option.suggested ? 'border-orange-200 bg-orange-50/40' : 'border-slate-200'}`}><input type="checkbox" checked={competitorTypes.includes(option.type)} onChange={() => toggleCompetitorType(option.type)} className="mt-1 h-4 w-4" /><span><span className="font-semibold text-slate-900">{option.type}</span>{option.suggested && <Badge className="ml-2 bg-orange-100 text-orange-700">Sugerido</Badge>}<span className="mt-1 block text-xs leading-5 text-slate-500">{option.reason}</span></span></label>)}
               </div>
             </Card>
 
             <Card>
               <Badge className="bg-slate-100 text-slate-600">4 — Região e clientes atuais</Badge>
               <h2 className="mt-4 text-xl font-bold text-slate-900">Defina o raio de análise e, opcionalmente, envie CEPs de clientes</h2>
-              <p className="mt-2 text-sm text-slate-500">O upload de CEPs é opcional e serve para demonstrar onde estão os clientes atuais da empresa. Mesmo sem planilha, a ferramenta analisa a região de atuação da empresa a partir do raio informado.</p>
+              <p className="mt-2 text-sm text-slate-500">
+                A planilha de CEPs é opcional. Se você não tiver uma lista de clientes, deixe essa parte em branco: a ferramenta ainda analisa a região em torno da empresa usando o raio informado.
+              </p>
               <div className="mt-5 max-w-xs">
                 <label className="text-sm font-semibold text-slate-700">Raio de análise em torno da empresa</label>
-                <Input type="number" min={1} max={50} value={analysisRadiusKm} onChange={(event) => setAnalysisRadiusKm(Number(event.target.value || 8))} />
-                <p className="mt-1 text-xs text-slate-500">Padrão: 8 km. Limite operacional: 1 a 50 km.</p>
+                <Input type="number" min={1} max={50} value={analysisRadiusKm} onChange={(event) => setAnalysisRadiusKm(clampAnalysisRadius(Number(event.target.value || 8)))} onBlur={() => setAnalysisRadiusKm((current) => clampAnalysisRadius(current))} />
+                <p className="mt-1 text-xs text-slate-500">Padrão: 8 km. Limite: 1 a 50 km. Valores maiores são ajustados automaticamente para 50 km.</p>
               </div>
-              <a href="/modelo-ceps-clientes.csv" download className="mt-5 inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
-                <Download className="mr-2 h-4 w-4" /> Baixar modelo CSV de CEPs
-              </a>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <p><strong>Formato aceito:</strong> uma coluna chamada <code className="rounded bg-white px-1 py-0.5">cep</code>. O CEP pode estar como <code className="rounded bg-white px-1 py-0.5">22775003</code>, <code className="rounded bg-white px-1 py-0.5">22775-003</code> ou <code className="rounded bg-white px-1 py-0.5">22.775-003</code>; a ferramenta usa apenas os 8 números.</p>
+                <p className="mt-2">Não envie nomes, telefones, e-mails ou outros dados pessoais. Se essas colunas existirem, serão ignoradas.</p>
+                <a href="/modelo-ceps-clientes.csv" download className="mt-4 inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                  <Download className="mr-2 h-4 w-4" /> Baixar modelo CSV de CEPs
+                </a>
+              </div>
               <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-orange-400 hover:bg-orange-50">
                 <FileSpreadsheet className="h-10 w-10 text-orange-500" />
                 <span className="mt-3 font-semibold text-slate-800">Selecionar arquivo CSV/XLSX de CEPs, opcional</span>
-                <span className="mt-1 text-sm text-slate-500">Use o modelo CSV se quiser começar rápido. Limite de 50MB. Apenas a coluna CEP será processada.</span>
+                <span className="mt-1 text-sm text-slate-500">Use o modelo CSV para começar rápido. Limite de 50MB. Apenas a coluna CEP será processada; a análise funciona mesmo sem arquivo.</span>
                 <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(event) => handleFile(event.target.files?.[0] || null)} />
               </label>
               {sensitiveWarning && <p className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm text-yellow-800">Foram identificadas colunas que não são necessárias para esta análise. Apenas os CEPs serão processados.</p>}
@@ -349,7 +424,7 @@ export function MarketIntelligenceApp() {
                 <div>
                   <Badge className="bg-orange-100 text-orange-700">5 — Iniciar</Badge>
                   <h2 className="mt-3 text-2xl font-bold text-slate-900">Iniciar análise da região</h2>
-                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, os CNAEs selecionados, os tipos de concorrentes, o raio de {analysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
+                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, os CNAEs selecionados, os tipos de concorrentes, o raio de {safeAnalysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
                 </div>
                 <Button className="min-w-56" onClick={startAnalysis} disabled={!canAnalyze}>{loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />} Iniciar análise</Button>
               </div>

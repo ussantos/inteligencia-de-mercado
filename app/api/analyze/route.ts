@@ -32,7 +32,15 @@ export async function POST(request: Request) {
 
   try {
     await assertUserRateLimit(userId);
-    const body = schema.parse(await request.json());
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success) {
+      const radiusIssue = parsed.error.issues.find((issue) => issue.path.join('.') === 'analysisRadiusKm');
+      if (radiusIssue) {
+        return NextResponse.json({ error: 'O raio de análise deve ficar entre 1 e 50 km. Ajuste o campo e tente novamente.' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Alguns dados enviados estão em formato inválido. Revise o formulário e tente novamente.' }, { status: 400 });
+    }
+    const body = parsed.data;
     const competitorTypes = body.competitorTypes.length
       ? body.competitorTypes
       : body.competitorType && isCompetitorType(body.competitorType)
