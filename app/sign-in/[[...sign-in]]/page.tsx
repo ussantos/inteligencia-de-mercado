@@ -8,7 +8,14 @@ export default function SignInPage() {
     <main className="min-h-screen bg-slate-100 px-4 py-10">
       <div className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[460px_1fr]">
         <div className="w-full rounded-3xl bg-white p-8 text-center shadow-xl">
-          <p className="text-sm font-semibold text-orange-600">Inteligência de Mercado</p>
+          <a
+            href="https://www.myrobotbarra.com.br/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-base font-semibold text-orange-600 transition hover:text-orange-700 hover:underline hover:underline-offset-4"
+          >
+            My Robot Barra da Tijuca
+          </a>
           <h2 className="mt-2 text-3xl font-bold text-slate-900">Ferramenta para Análise de Mercado</h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">
             Projeto educativo criado para aplicar conceitos dos cursos Inteligência Artificial e App Developer da My Robot Barra da Tijuca. O código está disponível no GitHub sob licença{' '}
