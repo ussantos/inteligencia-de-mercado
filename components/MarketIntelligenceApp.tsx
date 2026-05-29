@@ -3,8 +3,8 @@
 // Este componente e a tela principal que o usuario usa.
 // Ele guarda o que a pessoa digitou, consulta CNPJ, le arquivos de CEPs e pede a analise ao servidor.
 // "use client" significa que este codigo roda no navegador, porque precisa reagir a cliques e uploads.
-import { SignOutButton, UserButton, useUser } from '@clerk/nextjs';
-import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, Radar, ShieldCheck } from 'lucide-react';
+import { UserButton, useAuth, useClerk, useUser } from '@clerk/nextjs';
+import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, LogOut, Radar, ShieldCheck } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -81,6 +81,8 @@ export function MarketIntelligenceApp() {
   // Estes estados sao como caixinhas de memoria da tela.
   // Cada caixinha guarda uma parte do formulario ou do resultado para o React redesenhar a tela quando algo muda.
   const { user } = useUser();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const [cnpj, setCnpj] = useState('');
   const [unidade, setUnidade] = useState<UnidadeNegocio | null>(null);
   const [selectedCnaes, setSelectedCnaes] = useState<CnaeOption[]>([]);
@@ -94,10 +96,19 @@ export function MarketIntelligenceApp() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [blobWarning, setBlobWarning] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const allCnaes = useMemo(() => unidade?.cnaes?.length ? unidade.cnaes : unidade ? [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }] : [], [unidade]);
   const canAnalyze = Boolean(unidade && selectedCnaes.length > 0 && competitorTypes.length > 0 && !loadingAnalysis);
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
+
+  useEffect(() => {
+    // Se o navegador ficou com uma sessao antiga ou incompleta, mandamos a pessoa para o login.
+    // Isso evita a tela parecer logada enquanto as APIs do servidor respondem "Nao autenticado".
+    if (isLoaded && !isSignedIn) {
+      window.location.replace('/sign-in');
+    }
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
     // Quando o CNPJ e encontrado, selecionamos automaticamente o CNAE principal.
@@ -108,6 +119,39 @@ export function MarketIntelligenceApp() {
     }
   }, [unidade]);
 
+  async function jsonAuthHeaders() {
+    // O Azure/Next pode nao repassar cookies do Clerk do jeito esperado em todos os cenarios.
+    // Por isso enviamos tambem o token Bearer, deixando as APIs reconhecerem a sessao de forma explicita.
+    const token = await getToken();
+    if (!token) {
+      throw new Error('Sua sessão expirou. Clique em Sair e entre novamente.');
+    }
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    };
+  }
+
+  async function handleUnauthorized(error: unknown, fallback: string) {
+    const message = error instanceof Error ? error.message : fallback;
+    if (/não autenticado|nao autenticado|sessão expirou|sessao expirou/i.test(message)) {
+      setGlobalError('Sua sessão expirou ou ficou inconsistente. Entre novamente para continuar.');
+      return;
+    }
+    setGlobalError(message);
+  }
+
+  async function handleSignOut() {
+    // Logout explicito do Clerk. O redirecionamento evita ficar parado em uma pagina protegida com sessao antiga.
+    setSigningOut(true);
+    setGlobalError(null);
+    try {
+      await signOut({ redirectUrl: '/sign-in' });
+    } catch {
+      window.location.assign('/sign-in');
+    }
+  }
+
   async function handleCnpjLookup() {
     // Esta funcao chama nossa API de CNPJ.
     // Se der certo, guardamos os dados da empresa; se der erro, mostramos uma mensagem amigavel.
@@ -115,12 +159,12 @@ export function MarketIntelligenceApp() {
     setGlobalError(null);
     setUnidade(null);
     try {
-      const response = await fetch('/api/cnpj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cnpj }) });
+      const response = await fetch('/api/cnpj', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ cnpj }) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao consultar CNPJ.');
       setUnidade(json.unidade);
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : 'Erro ao consultar CNPJ.');
+      await handleUnauthorized(error, 'Erro ao consultar CNPJ.');
     } finally {
       setLoadingCnpj(false);
     }
@@ -158,7 +202,7 @@ export function MarketIntelligenceApp() {
     setSensitiveWarning(parsed.sensitiveWarning);
 
     try {
-      const sas = await fetch('/api/blob/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: file.name }) });
+      const sas = await fetch('/api/blob/sas', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ fileName: file.name }) });
       const data = await sas.json();
       if (!sas.ok) throw new Error(data.error);
       await fetch(data.sasUrl, { method: 'PUT', headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' }, body: file });
@@ -176,17 +220,29 @@ export function MarketIntelligenceApp() {
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: await jsonAuthHeaders(),
         body: JSON.stringify({ unidade, ceps: uniqueCeps, selectedCnaes, competitorTypes, analysisRadiusKm })
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
       setResult(json.result);
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : 'Erro ao processar análise.');
+      await handleUnauthorized(error, 'Erro ao processar análise.');
     } finally {
       setLoadingAnalysis(false);
     }
+  }
+
+  if (!isLoaded || (isLoaded && !isSignedIn)) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+        <Card className="max-w-md text-center">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-orange-600" />
+          <p className="mt-4 text-sm font-semibold text-slate-700">Verificando sua sessão...</p>
+        </Card>
+      </main>
+    );
   }
 
   return (
@@ -200,7 +256,10 @@ export function MarketIntelligenceApp() {
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-slate-500 md:inline">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</span>
             <UserButton />
-            <SignOutButton><button className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sair</button></SignOutButton>
+            <button onClick={handleSignOut} disabled={signingOut} className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+              {signingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+              Sair
+            </button>
           </div>
         </div>
       </header>

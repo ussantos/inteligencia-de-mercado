@@ -5,11 +5,15 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { useAuth, useClerk } from '@clerk/nextjs';
 import { Download, FileDown, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import type { AnalysisResult } from '@/lib/types';
 
 export function ExportButtons({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
+  const { getToken } = useAuth();
+  const { signOut } = useClerk();
+
   async function exportPdf() {
     // O PDF e criado tirando uma "foto" da area do relatorio e colocando essa imagem em uma pagina A4.
     const element = document.getElementById('analysis-report');
@@ -41,11 +45,23 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
     // Compartilhar cria um link salvo no banco.
     // Depois copiamos esse link para a area de transferencia do usuario.
     if (!result.id) return;
-    const response = await fetch('/api/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analysisId: result.id }) });
+    const token = await getToken();
+    if (!token) {
+      await signOut({ redirectUrl: '/sign-in' });
+      return;
+    }
+    const response = await fetch('/api/share', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ analysisId: result.id })
+    });
     const json = await response.json();
     if (json.url) {
       await navigator.clipboard.writeText(`${window.location.origin}${json.url}`);
       alert('Link compartilhável copiado para a área de transferência.');
+    } else if (response.status === 401) {
+      await signOut({ redirectUrl: '/sign-in' });
     }
   }
 
