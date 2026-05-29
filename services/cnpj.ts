@@ -36,6 +36,33 @@ function buildCnaes(principalCodigo: string, principalDescricao: string, secunda
   return cnaes;
 }
 
+function cnaesFromCachedRaw(raw: any, principalCodigo: string, principalDescricao: string): CnaeOption[] {
+  // Caches antigos podem ter sido gravados antes de salvarmos todos os CNAEs.
+  // Aqui tentamos reconstruir a lista a partir dos formatos conhecidos antes de decidir se precisa buscar de novo.
+  if (Array.isArray(raw.cnaes) && raw.cnaes.length) {
+    return raw.cnaes
+      .map((cnae: any) => ({
+        codigo: onlyDigits(cnae.codigo),
+        descricao: normalizeText(cnae.descricao) || '',
+        tipo: cnae.tipo === 'Principal' ? 'Principal' as const : 'Secundário' as const
+      }))
+      .filter((cnae: CnaeOption) => cnae.descricao);
+  }
+
+  if (Array.isArray(raw.cnaes_secundarios) && raw.cnaes_secundarios.length) {
+    return buildCnaes(principalCodigo, principalDescricao, raw.cnaes_secundarios);
+  }
+
+  if (Array.isArray(raw.atividades_secundarias) && raw.atividades_secundarias.length) {
+    return buildCnaes(principalCodigo, principalDescricao, raw.atividades_secundarias);
+  }
+
+  const secondaryDescriptions = Array.isArray(raw.cnaeSecundarios)
+    ? raw.cnaeSecundarios.map((descricao: unknown) => ({ descricao }))
+    : [];
+  return buildCnaes(principalCodigo, principalDescricao, secondaryDescriptions);
+}
+
 function mapBrasilApi(data: any, cnpj: string): UnidadeNegocio {
   const secundariosRaw = Array.isArray(data.cnaes_secundarios) ? data.cnaes_secundarios : [];
   const cnaePrincipalCodigo = normalizeText(data.cnae_fiscal) || '';
@@ -150,29 +177,36 @@ export async function getCnpjData(input: string): Promise<UnidadeNegocio> {
 
   if (cached) {
     const raw = cached.rawJson as any;
-    return {
-      cnpj,
-      razaoSocial: cached.razaoSocial,
-      nomeFantasia: cached.nomeFantasia,
-      situacaoCadastral: raw.situacaoCadastral || raw.descricao_situacao_cadastral || raw.situacao || 'Não informada',
-      cnaePrincipalCodigo: cached.cnaeCode,
-      cnaePrincipalDescricao: cached.cnaeDesc,
-      cnaeSecundarios: raw.cnaeSecundarios || raw.cnaes?.filter((x: any) => x.tipo === 'Secundário').map((x: any) => x.descricao).filter(Boolean) || raw.cnaes_secundarios?.map((x: any) => x.descricao).filter(Boolean) || [],
-      cnaes: raw.cnaes || buildCnaes(cached.cnaeCode, cached.cnaeDesc, []),
-      logradouro: cached.logradouro,
-      numero: raw.numero || '',
-      complemento: raw.complemento || null,
-      bairro: cached.bairro,
-      municipio: cached.municipio,
-      uf: cached.uf,
-      cep: cached.cep,
-      telefone: raw.telefone || raw.ddd_telefone_1 || null,
-      email: raw.email || null,
-      porte: raw.porte || null,
-      naturezaJuridica: raw.natureza_juridica || null,
-      capitalSocial: raw.capital_social ? Number(raw.capital_social) : null,
-      dataAbertura: raw.data_inicio_atividade || raw.abertura || null
-    };
+    const cnaes = cnaesFromCachedRaw(raw, cached.cnaeCode, cached.cnaeDesc);
+    const cacheHasCompleteCnaes = raw.__cnaesComplete === true || cnaes.length > 1;
+    if (cacheHasCompleteCnaes) {
+      const cnaeSecundarios = cnaes.filter((cnae) => cnae.tipo === 'Secundário').map((cnae) => cnae.descricao);
+      return {
+        cnpj,
+        razaoSocial: cached.razaoSocial,
+        nomeFantasia: cached.nomeFantasia,
+        situacaoCadastral: raw.situacaoCadastral || raw.descricao_situacao_cadastral || raw.situacao || 'Não informada',
+        cnaePrincipalCodigo: cached.cnaeCode,
+        cnaePrincipalDescricao: cached.cnaeDesc,
+        cnaeSecundarios,
+        cnaes,
+        logradouro: cached.logradouro,
+        numero: raw.numero || '',
+        complemento: raw.complemento || null,
+        bairro: cached.bairro,
+        municipio: cached.municipio,
+        uf: cached.uf,
+        cep: cached.cep,
+        telefone: raw.telefone || raw.ddd_telefone_1 || null,
+        email: raw.email || null,
+        porte: raw.porte || null,
+        naturezaJuridica: raw.natureza_juridica || null,
+        capitalSocial: raw.capital_social ? Number(raw.capital_social) : null,
+        dataAbertura: raw.data_inicio_atividade || raw.abertura || null
+      };
+    }
+    // Se o cache antigo trouxe apenas o CNAE principal, seguimos para as fontes publicas e atualizamos o cache.
+    console.info(`Cache de CNPJ ${cnpj} sem CNAEs secundarios normalizados. Atualizando a partir das fontes publicas.`);
   }
 
   const errors: string[] = [];
@@ -209,7 +243,7 @@ export async function getCnpjData(input: string): Promise<UnidadeNegocio> {
           bairro: unidade.bairro,
           municipio: unidade.municipio,
           uf: unidade.uf,
-          rawJson: unidade as any,
+          rawJson: { ...unidade, __cnaesComplete: true } as any,
           cachedAt: new Date(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         },
@@ -224,7 +258,7 @@ export async function getCnpjData(input: string): Promise<UnidadeNegocio> {
           bairro: unidade.bairro,
           municipio: unidade.municipio,
           uf: unidade.uf,
-          rawJson: unidade as any,
+          rawJson: { ...unidade, __cnaesComplete: true } as any,
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         }
       });
