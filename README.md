@@ -54,7 +54,8 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - `/api/cnpj` consulta dados do CNPJ.
 - `/api/history` lista historico do usuario.
 - `/api/share` gera link compartilhavel.
-- `/api/blob/sas` gera SAS temporario para upload.
+- `/api/blob/upload` envia arquivo temporario para o Azure Blob Storage pelo servidor.
+- `/api/blob/sas` gera SAS temporario para upload legado.
 - `/api/blob/delete` apaga o blob temporario depois da analise.
 - `/.swa/health.html` e uma rota tecnica usada pelo Azure Static Web Apps para validar o deploy. O middleware nao deve bloquear esse caminho.
 
@@ -195,7 +196,9 @@ Importante: os limites gratuitos mudam com o tempo e variam por conta, projeto, 
 
 ## Upload temporario no Azure Blob
 
-O arquivo CSV/XLSX de CEPs e lido no navegador, e apenas os CEPs seguem para a analise. Quando o Azure Blob Storage esta configurado, a aplicacao tambem envia o arquivo para um container temporario usando SAS de curta duracao.
+O arquivo CSV/XLSX de CEPs e lido no navegador, e apenas os CEPs seguem para a analise. Quando o Azure Blob Storage esta configurado, a aplicacao tambem envia o arquivo para um container temporario pela rota `/api/blob/upload`.
+
+O upload passa pelo servidor para evitar erro de CORS no navegador. A rota antiga `/api/blob/sas` continua existindo por compatibilidade, mas a tela principal nao depende mais de upload direto do navegador para o Blob Storage.
 
 Depois que a analise termina com sucesso, a rota `/api/blob/delete` apaga o blob temporario pelo nome gerado pela aplicacao. Como camada extra de seguranca operacional, tambem e recomendado configurar uma regra de lifecycle no proprio Azure Storage para apagar blobs antigos do container temporario caso alguma sessao seja interrompida antes da limpeza pela aplicacao.
 

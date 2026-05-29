@@ -187,6 +187,16 @@ export function MarketIntelligenceApp() {
     };
   }
 
+  async function bearerAuthHeaders() {
+    // Para FormData nao podemos definir Content-Type manualmente.
+    // O navegador precisa criar o boundary do multipart sozinho; enviamos apenas o Bearer token.
+    const token = await getToken();
+    if (!token) {
+      throw new Error('Sua sessão expirou. Clique em Sair e entre novamente.');
+    }
+    return { Authorization: `Bearer ${token}` };
+  }
+
   async function handleUnauthorized(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
     if (/não autenticado|nao autenticado|sessão expirou|sessao expirou/i.test(message)) {
@@ -280,10 +290,11 @@ export function MarketIntelligenceApp() {
     }
 
     try {
-      const sas = await fetch('/api/blob/sas', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ fileName: file.name }) });
-      const data = await sas.json() as { error?: string; sasUrl?: string; blobName?: string };
-      if (!sas.ok || !data.sasUrl || !data.blobName) throw new Error(data.error || 'Não foi possível preparar o upload temporário.');
-      await fetch(data.sasUrl, { method: 'PUT', headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      const formData = new FormData();
+      formData.append('file', file);
+      const upload = await fetch('/api/blob/upload', { method: 'POST', credentials: 'include', headers: await bearerAuthHeaders(), body: formData });
+      const data = await upload.json() as { error?: string; blobName?: string };
+      if (!upload.ok || !data.blobName) throw new Error(data.error || 'Não foi possível enviar o arquivo temporário.');
       setUploadedBlob({ blobName: data.blobName });
       if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s) e arquivo temporário enviado com sucesso. A análise usará apenas os CEPs extraídos.`);
     } catch (error) {
