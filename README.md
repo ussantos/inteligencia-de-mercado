@@ -6,6 +6,20 @@ A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um r
 
 Você pode testar a aplicação nesta URL: https://gray-glacier-0dc52610f.7.azurestaticapps.net/sign-in
 
+## Carater educativo, cursos e licenca
+
+Este projeto tem carater educativo e demonstra como aplicar conceitos de inteligencia artificial, automacao, desenvolvimento web e analise de dados em uma ferramenta pratica de inteligencia de mercado.
+
+A ferramenta foi criada como projeto aplicado inspirado nos conceitos apresentados nos cursos [Inteligencia Artificial](https://www.myrobotbarra.com.br/inteligencia-artificial.html) e [App Developer](https://www.myrobotbarra.com.br/app-developer.html), da My Robot Barra da Tijuca.
+
+O codigo-fonte esta disponivel no GitHub em [ussantos/inteligencia-de-mercado](https://github.com/ussantos/inteligencia-de-mercado) sob a licenca [GNU GPL](https://www.gnu.org/licenses/gpl-3.0.html).
+
+## LGPD e privacidade
+
+A aplicacao deve ser usada com atencao a LGPD. O fluxo foi desenhado para processar temporariamente apenas os dados necessarios para a analise regional. No upload de planilhas, apenas CEPs sao usados; nomes, telefones, e-mails, CPF e outros dados pessoais devem ser evitados e, quando presentes, sao ignorados pela aplicacao.
+
+Nao inclua dados sensiveis, listas completas de clientes, credenciais, tokens, connection strings ou informacoes privadas em arquivos enviados, commits, issues ou exemplos publicos.
+
 ## Proposito
 
 A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da empresa, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
