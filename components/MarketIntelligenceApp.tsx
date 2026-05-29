@@ -21,6 +21,10 @@ interface ParsedCeps {
   sensitiveWarning: boolean;
 }
 
+interface UploadedBlob {
+  blobName: string;
+}
+
 function parseRows(rows: Record<string, unknown>[]): ParsedCeps {
   // A planilha pode ter muitas colunas, mas a aplicacao so precisa da coluna de CEP.
   // Se existirem colunas sensiveis, como telefone ou CPF, avisamos o usuario e ignoramos esses dados.
@@ -144,6 +148,7 @@ export function MarketIntelligenceApp() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [blobWarning, setBlobWarning] = useState<string | null>(null);
+  const [uploadedBlob, setUploadedBlob] = useState<UploadedBlob | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
   const allCnaes = useMemo(() => unidade?.cnaes?.length ? unidade.cnaes : unidade ? [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }] : [], [unidade]);
@@ -202,6 +207,22 @@ export function MarketIntelligenceApp() {
     }
   }
 
+  async function deleteTemporaryBlob(blob: UploadedBlob | null) {
+    // A planilha ja foi lida no navegador. Depois da analise, este helper pede ao servidor para apagar o blob temporario.
+    if (!blob) return false;
+    try {
+      const response = await fetch('/api/blob/delete', {
+        method: 'POST',
+        credentials: 'include',
+        headers: await jsonAuthHeaders(),
+        body: JSON.stringify({ blobName: blob.blobName })
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   async function handleCnpjLookup() {
     // Esta funcao chama nossa API de CNPJ.
     // Se der certo, guardamos os dados da empresa; se der erro, mostramos uma mensagem amigavel.
@@ -244,6 +265,10 @@ export function MarketIntelligenceApp() {
     // O arquivo e processado no navegador para extrair somente CEPs.
     // Depois tentamos subir o arquivo para o Azure Blob, mas a analise continua mesmo se esse upload falhar.
     if (!file) return;
+    if (uploadedBlob) {
+      await deleteTemporaryBlob(uploadedBlob);
+      setUploadedBlob(null);
+    }
     setErrors([]);
     setBlobWarning(null);
     const parsed = await parseFile(file);
@@ -256,9 +281,10 @@ export function MarketIntelligenceApp() {
 
     try {
       const sas = await fetch('/api/blob/sas', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ fileName: file.name }) });
-      const data = await sas.json();
-      if (!sas.ok) throw new Error(data.error);
+      const data = await sas.json() as { error?: string; sasUrl?: string; blobName?: string };
+      if (!sas.ok || !data.sasUrl || !data.blobName) throw new Error(data.error || 'Não foi possível preparar o upload temporário.');
       await fetch(data.sasUrl, { method: 'PUT', headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      setUploadedBlob({ blobName: data.blobName });
       if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s) e arquivo temporário enviado com sucesso. A análise usará apenas os CEPs extraídos.`);
     } catch (error) {
       if (parsed.ceps.length) {
@@ -287,6 +313,13 @@ export function MarketIntelligenceApp() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
       setResult(json.result);
+      if (uploadedBlob) {
+        const deleted = await deleteTemporaryBlob(uploadedBlob);
+        setUploadedBlob(null);
+        setBlobWarning(deleted
+          ? 'Análise concluída e arquivo temporário apagado do Azure Blob Storage.'
+          : 'Análise concluída. Não foi possível confirmar a exclusão do arquivo temporário; verifique as permissões do Azure Blob Storage.');
+      }
     } catch (error) {
       await handleUnauthorized(error, 'Erro ao processar análise.');
     } finally {

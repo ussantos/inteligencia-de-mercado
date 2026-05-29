@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeCep } from '@/lib/cep';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { getViaCep } from '@/services/viacep';
+import { assertMonthlyBudget } from '@/services/usage-budget';
 
 export interface GeoResult {
   cep: string;
@@ -68,6 +69,7 @@ export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
 
   if (locationIqUrl) {
     try {
+      await assertMonthlyBudget('LOCATIONIQ');
       const response = await fetchWithTimeout(locationIqUrl, {}, 10000);
       if (response.ok) {
         const json = (await response.json()) as Array<{ lat: string; lon: string }>;
@@ -85,6 +87,7 @@ export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
   if (lat == null || lng == null) {
     await waitNominatimSlot();
     try {
+      await assertMonthlyBudget('NOMINATIM');
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=br`;
       const response = await fetchWithTimeout(url, {
         headers: { 'User-Agent': 'inteligencia-de-mercado/1.0' }

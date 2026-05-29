@@ -2,6 +2,7 @@
 // ViaCEP transforma um CEP brasileiro em endereco, bairro, cidade e estado.
 import { normalizeCep } from '@/lib/cep';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { assertMonthlyBudget } from '@/services/usage-budget';
 
 export interface ViaCepResponse {
   cep: string;
@@ -18,6 +19,7 @@ export async function getViaCep(cep: string): Promise<ViaCepResponse | null> {
   if (normalized.length !== 8) return null;
 
   try {
+    await assertMonthlyBudget('VIACEP');
     const response = await fetchWithTimeout(`https://viacep.com.br/ws/${normalized}/json/`, {
       next: { revalidate: 60 * 60 * 24 }
     }, 8000);

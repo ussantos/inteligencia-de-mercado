@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { haversineKm } from '@/lib/haversine';
+import { assertMonthlyBudget } from '@/services/usage-budget';
 import { DEFAULT_COMPETITOR_TYPE, getConfigsForCompetitorType, type CompetitorType, type CompetitorTypeConfig } from '@/lib/competitor-types';
 import type { CategoriaEstrategica, StrategicPlace, UnidadeNegocio } from '@/lib/types';
 
@@ -163,11 +164,14 @@ export async function getStrategicPlaces(input: {
 
   const configs = getConfigsForCompetitorType(competitorType);
   const query = buildOverpassQuery(input.center.lat, input.center.lng, radiusM, competitorType);
-  const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: new URLSearchParams({ data: query })
-  }, 50000).catch(() => null);
+  const response = await (async () => {
+    await assertMonthlyBudget('OVERPASS');
+    return fetchWithTimeout('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: new URLSearchParams({ data: query })
+    }, 50000);
+  })().catch(() => null);
 
   if (!response || !response.ok) return [];
   const json = await response.json();

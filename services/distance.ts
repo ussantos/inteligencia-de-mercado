@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { haversineKm } from '@/lib/haversine';
+import { assertMonthlyBudget } from '@/services/usage-budget';
 
 export async function getDistance(origin: { cep: string; lat: number; lng: number }, dest: { cep: string; lat: number; lng: number }) {
   const cached = await prisma.distanceCache.findUnique({
@@ -35,6 +36,7 @@ export async function getDistance(origin: { cep: string; lat: number; lng: numbe
   }
 
   try {
+    await assertMonthlyBudget('ORS');
     const response = await fetchWithTimeout('https://api.openrouteservice.org/v2/matrix/driving-car', {
       method: 'POST',
       headers: {

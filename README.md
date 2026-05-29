@@ -31,6 +31,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Selecao de CNAEs e tipos de concorrentes/alternativas de mercado.
 - Analise por raio em torno do empreendimento, com padrao de 8 km.
 - Upload opcional de CSV/XLSX com CEPs de clientes.
+- Exclusao do arquivo temporario do Azure Blob Storage depois que a analise termina com sucesso.
 - Modelo CSV baixavel para preencher CEPs antes do upload.
 - Normalizacao e validacao de CEPs.
 - Geocodificacao com LocationIQ e fallback Nominatim.
@@ -54,6 +55,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - `/api/history` lista historico do usuario.
 - `/api/share` gera link compartilhavel.
 - `/api/blob/sas` gera SAS temporario para upload.
+- `/api/blob/delete` apaga o blob temporario depois da analise.
 - `/.swa/health.html` e uma rota tecnica usada pelo Azure Static Web Apps para validar o deploy. O middleware nao deve bloquear esse caminho.
 
 ## Arquitetura
@@ -138,16 +140,64 @@ Recomendadas:
 - `GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS`
 - `ANALYSIS_RATE_LIMIT_PER_HOUR`
 - `SHARED_LINK_TTL_DAYS`
+- `MONTHLY_BUDGET_ENABLED`
+- `MONTHLY_BUDGET_PERCENT`
 
 Opcionais:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+- `GOOGLE_PLACES_MONTHLY_FREE_QUOTA` ou `GOOGLE_PLACES_MONTHLY_BUDGET`
+- `LOCATIONIQ_MONTHLY_FREE_QUOTA` ou `LOCATIONIQ_MONTHLY_BUDGET`
+- `ORS_MONTHLY_FREE_QUOTA` ou `ORS_MONTHLY_BUDGET`
+- `OPENAI_MONTHLY_FREE_QUOTA` ou `OPENAI_MONTHLY_BUDGET`
+- `CNPJ_PUBLIC_MONTHLY_BUDGET`
+- `VIACEP_MONTHLY_BUDGET`
+- `NOMINATIM_MONTHLY_BUDGET`
+- `OVERPASS_MONTHLY_BUDGET`
 
 Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.
+
+## Controle de cotas e custos
+
+A aplicacao possui dois tipos de freio:
+
+- `ANALYSIS_RATE_LIMIT_PER_HOUR` limita quantas analises cada usuario pode iniciar por hora.
+- As variaveis `*_MONTHLY_FREE_QUOTA`, `*_MONTHLY_BUDGET`, `MONTHLY_BUDGET_PERCENT` e `MONTHLY_BUDGET_ENABLED` limitam chamadas mensais globais para APIs externas.
+
+Para ficar em cerca de 60% do limite gratuito de um fornecedor, consulte o limite atual no painel oficial do servico e configure os valores reais do seu projeto:
+
+```env
+MONTHLY_BUDGET_ENABLED=true
+MONTHLY_BUDGET_PERCENT=60
+GOOGLE_PLACES_MONTHLY_FREE_QUOTA=<limite_mensal_google_places>
+LOCATIONIQ_MONTHLY_FREE_QUOTA=<limite_mensal_locationiq>
+ORS_MONTHLY_FREE_QUOTA=<limite_mensal_openrouteservice>
+OPENAI_MONTHLY_BUDGET=<maximo_mensal_de_chamadas_openai>
+```
+
+Tambem e possivel informar o limite direto ja calculado:
+
+```env
+GOOGLE_PLACES_MONTHLY_BUDGET=<60_porcento_do_limite_google_places>
+LOCATIONIQ_MONTHLY_BUDGET=<60_porcento_do_limite_locationiq>
+ORS_MONTHLY_BUDGET=<60_porcento_do_limite_openrouteservice>
+```
+
+O contador mensal e salvo na tabela `UserRateLimit` com uma chave tecnica do sistema, sem criar uma nova tabela. Quando o limite configurado e atingido, a chamada externa e bloqueada e a analise usa fallback quando existir, como cache, distancia em linha reta, Nominatim ou recomendacoes locais.
+
+Para fontes publicas sem chave, como CNPJ, ViaCEP, Nominatim e Overpass, nao ha uma unica variavel universal de free tier mensal. Se quiser ser conservador, configure limites diretos como `CNPJ_PUBLIC_MONTHLY_BUDGET`, `VIACEP_MONTHLY_BUDGET`, `NOMINATIM_MONTHLY_BUDGET` e `OVERPASS_MONTHLY_BUDGET`.
+
+Importante: os limites gratuitos mudam com o tempo e variam por conta, projeto, API, SKU e billing. Por isso a aplicacao nao fixa numeros como verdade absoluta. Configure os valores de acordo com o painel atual do Google Cloud, LocationIQ, OpenRouteService e OpenAI. No caso da OpenAI, o freio da aplicacao conta chamadas, nao tokens nem custo financeiro exato; use tambem os controles de uso/billing do provedor.
+
+## Upload temporario no Azure Blob
+
+O arquivo CSV/XLSX de CEPs e lido no navegador, e apenas os CEPs seguem para a analise. Quando o Azure Blob Storage esta configurado, a aplicacao tambem envia o arquivo para um container temporario usando SAS de curta duracao.
+
+Depois que a analise termina com sucesso, a rota `/api/blob/delete` apaga o blob temporario pelo nome gerado pela aplicacao. Como camada extra de seguranca operacional, tambem e recomendado configurar uma regra de lifecycle no proprio Azure Storage para apagar blobs antigos do container temporario caso alguma sessao seja interrompida antes da limpeza pela aplicacao.
 
 ## Google Places
 

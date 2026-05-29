@@ -4,6 +4,7 @@
 import { prisma } from '@/lib/prisma';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { haversineKm } from '@/lib/haversine';
+import { assertMonthlyBudget } from '@/services/usage-budget';
 import {
   DEFAULT_COMPETITOR_TYPES,
   getActiveCompetitorTypes,
@@ -125,6 +126,7 @@ async function googleTextSearch(params: {
   if (!key) return { places: [], diagnostic: 'Google Places não foi chamado porque nenhuma chave foi encontrada no runtime.' };
 
   try {
+    await assertMonthlyBudget('GOOGLE_PLACES');
     const response = await fetchWithTimeout(GOOGLE_TEXT_SEARCH_URL, {
       method: 'POST',
       headers: {
