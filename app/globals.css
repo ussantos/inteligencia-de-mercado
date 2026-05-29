@@ -19,10 +19,15 @@ body {
   color: #0f172a;
 }
 
-.leaflet-container {
+.leaflet-container,
+.google-map-canvas {
   width: 100%;
   min-height: 560px;
   border-radius: 1.25rem;
+}
+
+.google-map-canvas {
+  overflow: hidden;
 }
 
 @media print {

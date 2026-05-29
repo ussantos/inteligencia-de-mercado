@@ -37,7 +37,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Geocodificacao com LocationIQ e fallback Nominatim.
 - Distancia por linha reta e, quando configurado, rota com OpenRouteService.
 - Busca de concorrentes e locais relevantes via Google Places API.
-- Mapa Leaflet com OpenStreetMap para visualizacao.
+- Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras, locais relevantes e calor dos CEPs.
 - Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, evolucao incremental e plano de acao.
 - Exportacao PDF e XLSX no navegador.
@@ -62,7 +62,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 ## Arquitetura
 
 - Framework: Next.js 15 com App Router.
-- UI: React 19, Tailwind CSS, lucide-react, Recharts e Leaflet.
+- UI: React 19, Tailwind CSS, lucide-react, Recharts e Google Maps JavaScript API.
 - Autenticacao: Clerk.
 - Banco: PostgreSQL via Prisma 6.19.3.
 - Storage opcional: Azure Blob Storage para uploads temporarios.
@@ -126,6 +126,10 @@ Obrigatorias para a aplicacao principal:
 - `DATABASE_URL`
 - `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`
 
+Obrigatoria para exibir o mapa Google Maps no navegador:
+
+- `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+
 Recomendadas para evitar loop de autenticacao em producao:
 
 - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
@@ -148,7 +152,6 @@ Opcionais:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
-- `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
 - `GOOGLE_PLACES_MONTHLY_FREE_QUOTA` ou `GOOGLE_PLACES_MONTHLY_BUDGET`
 - `LOCATIONIQ_MONTHLY_FREE_QUOTA` ou `LOCATIONIQ_MONTHLY_BUDGET`
 - `ORS_MONTHLY_FREE_QUOTA` ou `ORS_MONTHLY_BUDGET`
@@ -161,6 +164,179 @@ Opcionais:
 Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.
+
+## APIs, servicos externos e leituras necessarias
+
+Para implementar ou adaptar este sistema em outro ambiente, leia a documentacao de cada servico usado e configure as chaves com escopos separados. A regra mais importante e: chave publica de navegador so para recursos que precisam aparecer no browser; chave server-side so no Azure/GitHub Secrets.
+
+### Azure Static Web Apps
+
+Uso no projeto: hospedagem, variaveis de ambiente, GitHub Actions e runtime gerenciado para rotas dinamicas do Next.js.
+
+Leia principalmente:
+
+- [Application settings do Azure Static Web Apps](https://learn.microsoft.com/en-us/azure/static-web-apps/application-settings), para entender como publicar secrets e variaveis usadas pela API.
+- [Build configuration do Azure Static Web Apps](https://learn.microsoft.com/en-us/azure/static-web-apps/build-configuration), para confirmar `app_location`, `output_location`, token de deploy e integracao com GitHub Actions.
+
+Configure:
+
+- `AZURE_STATIC_WEB_APPS_API_TOKEN` como secret no GitHub Actions.
+- Variaveis de producao no Azure Static Web Apps em **Environment variables**.
+- Apenas um workflow ativo para evitar deploys concorrentes.
+
+### Azure Blob Storage
+
+Uso no projeto: upload temporario de CSV/XLSX de CEPs e exclusao do arquivo depois que a analise termina.
+
+Leia principalmente:
+
+- [Upload de blobs com JavaScript/TypeScript](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-upload-javascript), para entender containers, blobs e cliente `@azure/storage-blob`.
+- Documentacao de lifecycle management do Azure Storage, caso queira apagar automaticamente blobs antigos como segunda camada de seguranca.
+
+Configure:
+
+- `AZURE_STORAGE_CONNECTION_STRING`
+- `AZURE_STORAGE_CONTAINER_NAME`
+- Uma regra de lifecycle no container temporario, recomendada mesmo com a exclusao feita pela aplicacao.
+
+### Clerk
+
+Uso no projeto: autenticacao, tela `/sign-in`, protecao das rotas e sessao do usuario.
+
+Leia principalmente:
+
+- [Variaveis e chaves do Clerk](https://clerk.com/docs/upgrade-guides/api-keys), para separar publishable key e secret key.
+- [Pagina customizada de sign-in/sign-up do Clerk para Next.js](https://clerk.com/docs/nextjs/guides/development/custom-sign-in-or-up-page), para entender URLs de entrada e redirecionamento.
+
+Configure:
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+
+### PostgreSQL e Prisma
+
+Uso no projeto: cache de CNPJ, cache de Places, historico, compartilhamento e controle de cotas mensais.
+
+Leia principalmente:
+
+- [Data sources do Prisma](https://www.prisma.io/docs/orm/v6/prisma-schema/overview/data-sources), para entender como o Prisma usa a URL do banco.
+- [Connection URLs do Prisma](https://www.prisma.io/docs/orm/reference/connection-urls), para montar corretamente `DATABASE_URL`.
+
+Configure:
+
+- `DATABASE_URL`
+- `prisma generate` no build.
+- `binaryTargets` no `schema.prisma` para o ambiente Linux/OpenSSL usado pelo Azure.
+
+### Google Maps JavaScript API
+
+Uso no projeto: mapa visual do relatorio, camadas, marcadores e mapa de calor.
+
+Leia principalmente:
+
+- [Troubleshooting da Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/troubleshooting), para erros de chave, billing, APIs nao habilitadas e restricoes incorretas.
+- [Politicas e atribuicoes da Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/policies), para uso correto dos mapas e conteudos do Google.
+
+Configure:
+
+- `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+- Ative **Maps JavaScript API** no Google Cloud.
+- Restrinja esta chave por **HTTP referrer**, permitindo o dominio do Azure Static Web Apps e o dominio final de producao.
+- Nao use esta chave publica no backend.
+
+### Google Places API (New)
+
+Uso no projeto: busca de concorrentes, locais relevantes, avaliacoes, quantidade de avaliacoes, enderecos e tipos de locais.
+
+Leia principalmente:
+
+- [Text Search (New)](https://developers.google.com/maps/documentation/places/web-service/reference/rest/v1/places/searchText), porque o sistema chama `places:searchText`.
+- [Visao geral da Places API (New)](https://developers.google.com/maps/documentation/places/web-service/op-overview), para entender tipos de busca, campos retornados e cobranca.
+
+Configure:
+
+- `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`
+- Ative **Places API** no Google Cloud.
+- Permita a **Places API** nas restricoes de API da chave.
+- Use uma chave separada da chave do navegador.
+- Nao aplique restricao de HTTP referrer nessa chave server-side; se quiser restringir, use mecanismos apropriados para chamadas de servidor.
+- Verifique billing, cotas e logs do Google Cloud.
+
+### LocationIQ
+
+Uso no projeto: geocodificacao de enderecos e CEPs quando a chave esta configurada.
+
+Leia principalmente:
+
+- [Documentacao da LocationIQ](https://docs.locationiq.com/docs/choose-the-right-api), para escolher Search/Forward Geocoding.
+- [API Reference da LocationIQ](https://api-reference.locationiq.com/), para parametros, limites e formato de resposta.
+
+Configure:
+
+- `LOCATIONIQ_API_KEY`
+- Limites mensais por `LOCATIONIQ_MONTHLY_FREE_QUOTA` ou `LOCATIONIQ_MONTHLY_BUDGET`, se quiser controlar uso.
+
+### OpenRouteService
+
+Uso no projeto: distancia de carro e tempo estimado quando a chave esta configurada; sem ela, a aplicacao usa distancia em linha reta.
+
+Leia principalmente:
+
+- [Matrix Endpoint do OpenRouteService](https://giscience.github.io/openrouteservice/v8.2.0/api-reference/endpoints/matrix/), porque o sistema usa matriz de distancia/tempo.
+
+Configure:
+
+- `ORS_API_KEY`
+- `ORS_MONTHLY_FREE_QUOTA` ou `ORS_MONTHLY_BUDGET`, se quiser limitar chamadas.
+
+### OpenAI API
+
+Uso no projeto: enriquecimento opcional das recomendacoes, posicionamento, personas e plano de acao.
+
+Leia principalmente:
+
+- [Pricing da OpenAI API](https://platform.openai.com/docs/pricing), para custo por modelo e tokens.
+- [Rate limits da OpenAI API](https://help.openai.com/en/articles/5955598), para entender limites por projeto/organizacao.
+
+Configure:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `OPENAI_MONTHLY_BUDGET`, lembrando que o freio interno conta chamadas, nao custo exato por token.
+
+### Fontes publicas de CNPJ e CEP
+
+Uso no projeto: dados cadastrais da empresa, endereco, CNAEs e normalizacao de CEPs.
+
+Leia principalmente:
+
+- [ReceitaWS Developers](https://developers.receitaws.com.br/), para entender API publica/comercial, cache e limites.
+- [OpenCNPJ](https://opencnpj.com/), para consulta publica de CNPJ.
+- [ViaCEP](https://viacep.com.br/), para formato de CEP e retorno de endereco.
+- [BrasilAPI CNPJ](https://brasilapi.com.br/docs#tag/CNPJ), se quiser manter ou ampliar fontes publicas de CNPJ.
+
+Configure:
+
+- Nao ha chave obrigatoria para ViaCEP.
+- Use cache no banco para reduzir chamadas repetidas.
+- Configure limites conservadores com `CNPJ_PUBLIC_MONTHLY_BUDGET` e `VIACEP_MONTHLY_BUDGET`, se necessario.
+
+### Nominatim e Overpass
+
+Uso no projeto: fallback legado para geocodificacao e locais baseados em OpenStreetMap. O mapa principal do relatorio agora usa Google Maps.
+
+Leia principalmente:
+
+- [Politica de uso do Nominatim](https://operations.osmfoundation.org/policies/nominatim/), porque o servico publico tem limites e exige uso responsavel.
+- [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API), para entender consultas OSM caso decida reativar ou ampliar esse fallback.
+
+Configure:
+
+- Use como fallback, nao como fonte intensiva.
+- Configure `NOMINATIM_MONTHLY_BUDGET` e `OVERPASS_MONTHLY_BUDGET`, se quiser freios adicionais.
 
 ## Controle de cotas e custos
 

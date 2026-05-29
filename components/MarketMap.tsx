@@ -1,41 +1,249 @@
 'use client';
 
-// Este componente desenha o mapa.
-// Ele coloca marcadores para a empresa, clientes e concorrentes, usando Leaflet e tiles do OpenStreetMap.
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-
-import L from 'leaflet';
-import { useEffect, useMemo, useState } from 'react';
-import { CircleMarker, LayersControl, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
-import type { AnalysisResult } from '@/lib/types';
+// Este componente desenha o mapa do relatorio usando Google Maps.
+// A chave publica do navegador serve apenas para mostrar o mapa; a busca de concorrentes continua no servidor.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AnalysisResult, StrategicPlace } from '@/lib/types';
 import { formatCep, formatKm } from '@/lib/utils';
 
-let leafletPluginsLoaded = false;
+type GoogleWindow = Window & {
+  google?: any;
+  __googleMapsPromise?: Promise<void>;
+};
 
-async function ensureLeafletPluginsLoaded() {
-  // Alguns plugins do Leaflet so existem no navegador.
-  // Por isso carregamos esses plugins apenas depois que a pagina ja esta rodando no computador da pessoa.
-  if (leafletPluginsLoaded) return;
-  if (typeof window === 'undefined') return;
-  (window as typeof window & { L?: typeof L }).L = L;
-  await import('leaflet.heat');
-  await import('leaflet.markercluster');
-  leafletPluginsLoaded = true;
+const PLACE_COLORS: Record<string, string> = {
+  direto: '#0f172a',
+  indireto: '#475569',
+  barreira: '#f97316',
+  polo: '#7c3aed',
+  parceria: '#16a34a',
+  outro: '#0891b2'
+};
+
+function getGoogleWindow() {
+  return window as GoogleWindow;
 }
 
-const unitIcon = L.divIcon({ html: '<div style="background:#2563eb;color:white;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;border:3px solid white;box-shadow:0 2px 10px #0003">E</div>', className: '', iconSize: [28, 28] });
-const placeIcon = L.divIcon({ html: '<div style="background:#0f172a;color:white;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid white;box-shadow:0 2px 10px #0003">•</div>', className: '', iconSize: [24, 24] });
-const obstacleIcon = L.divIcon({ html: '<div style="background:#f97316;color:white;border-radius:999px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid white;box-shadow:0 2px 10px #0003">!</div>', className: '', iconSize: [26, 26] });
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
 
 function isValidCoord(lat: unknown, lng: unknown) {
   return typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng);
 }
 
+function loadGoogleMaps(apiKey: string) {
+  const googleWindow = getGoogleWindow();
+  if (googleWindow.google?.maps) return Promise.resolve();
+  if (!googleWindow.__googleMapsPromise) {
+    googleWindow.__googleMapsPromise = new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      const libraries = 'visualization';
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=${libraries}&language=pt-BR&region=BR`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Nao foi possivel carregar o Google Maps.'));
+      document.head.appendChild(script);
+    });
+  }
+  return googleWindow.__googleMapsPromise;
+}
+
+function strategicColor(place: StrategicPlace) {
+  const category = place.categoriaEstrategica.toLowerCase();
+  if (category.includes('barreira')) return PLACE_COLORS.barreira;
+  if (category.includes('parceria')) return PLACE_COLORS.parceria;
+  if (category.includes('polo')) return PLACE_COLORS.polo;
+  if (category.includes('indireto')) return PLACE_COLORS.indireto;
+  if (category.includes('direto')) return PLACE_COLORS.direto;
+  return PLACE_COLORS.outro;
+}
+
+function markerSymbol(google: any, color: string, scale = 8) {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: color,
+    fillOpacity: 0.95,
+    strokeColor: '#ffffff',
+    strokeWeight: 2,
+    scale
+  };
+}
+
+function makeInfoWindow(google: any, content: string) {
+  return new google.maps.InfoWindow({ content, maxWidth: 340 });
+}
+
+function clearOverlays(overlays: Array<{ setMap: (map: any) => void }>) {
+  overlays.forEach((overlay) => overlay.setMap(null));
+}
+
 export function MarketMap({ result }: { result: AnalysisResult }) {
-  // A posicao inicial do mapa e o endereco da empresa encontrado pelo CNPJ.
-  if (!isValidCoord(result.unidadeGeo.lat, result.unidadeGeo.lng)) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY;
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const overlaysRef = useRef<Array<{ setMap: (map: any) => void }>>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(apiKey ? 'loading' : 'error');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showCompany, setShowCompany] = useState(true);
+  const [showCustomers, setShowCustomers] = useState(true);
+  const [showPlaces, setShowPlaces] = useState(true);
+  const [showHeat, setShowHeat] = useState(false);
+
+  const center = useMemo(() => {
+    if (!isValidCoord(result.unidadeGeo.lat, result.unidadeGeo.lng)) return null;
+    return { lat: result.unidadeGeo.lat, lng: result.unidadeGeo.lng };
+  }, [result.unidadeGeo.lat, result.unidadeGeo.lng]);
+
+  const validPoints = useMemo(() => result.points.filter((point) => isValidCoord(point.lat, point.lng)), [result.points]);
+  const validPlaces = useMemo(() => result.strategicPlaces.filter((place) => isValidCoord(place.lat, place.lng)), [result.strategicPlaces]);
+
+  useEffect(() => {
+    if (!apiKey || !center || !mapElementRef.current) {
+      setStatus('error');
+      setErrorMessage('Configure NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY para exibir o Google Maps no navegador.');
+      return;
+    }
+
+    let cancelled = false;
+    setStatus('loading');
+    setErrorMessage('');
+
+    loadGoogleMaps(apiKey)
+      .then(() => {
+        if (cancelled || !mapElementRef.current) return;
+        const google = getGoogleWindow().google;
+        mapRef.current = new google.maps.Map(mapElementRef.current, {
+          center,
+          zoom: 12,
+          clickableIcons: true,
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true,
+          gestureHandling: 'greedy',
+          styles: [
+            { featureType: 'poi.business', stylers: [{ visibility: 'on' }] },
+            { featureType: 'transit', stylers: [{ visibility: 'simplified' }] }
+          ]
+        });
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStatus('error');
+          setErrorMessage('Nao foi possivel carregar o Google Maps. Verifique a chave publica, a Maps JavaScript API e as restricoes de HTTP referrer.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      clearOverlays(overlaysRef.current);
+      overlaysRef.current = [];
+      mapRef.current = null;
+    };
+  }, [apiKey, center]);
+
+  useEffect(() => {
+    const google = getGoogleWindow().google;
+    const map = mapRef.current;
+    if (status !== 'ready' || !google?.maps || !map || !center) return;
+
+    clearOverlays(overlaysRef.current);
+    overlaysRef.current = [];
+
+    const bounds = new google.maps.LatLngBounds();
+    const infoWindow = makeInfoWindow(google, '');
+    let boundsCount = 1;
+    bounds.extend(center);
+
+    if (showCompany) {
+      const marker = new google.maps.Marker({
+        map,
+        position: center,
+        title: 'Sua empresa',
+        label: { text: 'E', color: '#ffffff', fontWeight: '700' },
+        icon: markerSymbol(google, '#2563eb', 11)
+      });
+      marker.addListener('click', () => {
+        infoWindow.setContent(
+          `<strong>Sua empresa</strong><br>${escapeHtml(result.unidade.nomeFantasia || result.unidade.razaoSocial)}<br>${escapeHtml(result.unidadeGeo.endereco)}`
+        );
+        infoWindow.open(map, marker);
+      });
+      overlaysRef.current.push(marker);
+    }
+
+    if (showCustomers) {
+      validPoints.forEach((point) => {
+        const position = { lat: point.lat, lng: point.lng };
+        bounds.extend(position);
+        boundsCount += 1;
+        const marker = new google.maps.Marker({
+          map,
+          position,
+          title: `CEP ${formatCep(point.cep)}`,
+          icon: markerSymbol(google, '#2563eb', 6)
+        });
+        marker.addListener('click', () => {
+          infoWindow.setContent(
+            `<strong>CEP ${escapeHtml(formatCep(point.cep))}</strong><br>${escapeHtml(point.bairro)}, ${escapeHtml(point.cidade)}/${escapeHtml(point.uf)}<br>Distancia: ${escapeHtml(formatKm(point.distanciaLinhaRetaKm))}`
+          );
+          infoWindow.open(map, marker);
+        });
+        overlaysRef.current.push(marker);
+      });
+    }
+
+    if (showHeat && validPoints.length && google.maps.visualization?.HeatmapLayer) {
+      const heat = new google.maps.visualization.HeatmapLayer({
+        data: validPoints.map((point) => ({ location: new google.maps.LatLng(point.lat, point.lng), weight: 0.7 })),
+        radius: 28,
+        opacity: 0.65,
+        map
+      });
+      overlaysRef.current.push(heat);
+    }
+
+    if (showPlaces) {
+      validPlaces.slice(0, 120).forEach((place) => {
+        const position = { lat: place.lat, lng: place.lng };
+        const color = strategicColor(place);
+        bounds.extend(position);
+        boundsCount += 1;
+        const marker = new google.maps.Marker({
+          map,
+          position,
+          title: place.nome,
+          label: place.categoriaEstrategica.toLowerCase().includes('barreira') ? { text: '!', color: '#ffffff', fontWeight: '700' } : undefined,
+          icon: markerSymbol(google, color, place.categoriaEstrategica.toLowerCase().includes('barreira') ? 9 : 7)
+        });
+        marker.addListener('click', () => {
+          const rating = place.rating ? `<br>Avaliacao: ${escapeHtml(place.rating.toFixed(1))} (${escapeHtml(place.userRatingCount || 0)} avaliacoes)` : '';
+          const website = place.website ? `<br><a href="${escapeHtml(place.website)}" target="_blank" rel="noreferrer">Site do local</a>` : '';
+          infoWindow.setContent(
+            `<strong>${escapeHtml(place.nome)}</strong><br>${escapeHtml(place.categoriaEstrategica)}<br>${escapeHtml(place.subcategoria)}${rating}<br>Distancia: ${escapeHtml(formatKm(place.distanciaKm))}<br>Fonte: ${escapeHtml(place.fonte)}<br>${escapeHtml(place.observacaoEstrategica)}${website}`
+          );
+          infoWindow.open(map, marker);
+        });
+        overlaysRef.current.push(marker);
+      });
+    }
+
+    if (boundsCount > 1) {
+      map.fitBounds(bounds, 48);
+    } else {
+      map.setCenter(center);
+      map.setZoom(12);
+    }
+  }, [center, result.unidade.nomeFantasia, result.unidade.razaoSocial, result.unidadeGeo.endereco, showCompany, showCustomers, showHeat, showPlaces, status, validPlaces, validPoints]);
+
+  if (!center) {
     return (
       <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed bg-slate-50 p-6 text-center text-sm text-slate-500">
         Não foi possível desenhar o mapa porque a coordenada da empresa não foi encontrada.
@@ -43,76 +251,50 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
     );
   }
 
-  const center: [number, number] = [result.unidadeGeo.lat, result.unidadeGeo.lng];
-  const validPoints = result.points.filter((point) => isValidCoord(point.lat, point.lng));
-  const validPlaces = result.strategicPlaces.filter((place) => isValidCoord(place.lat, place.lng));
-
   return (
-    <MapContainer center={center} zoom={12} scrollWheelZoom className="z-0">
-      <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <LayersControl position="topright">
-        <LayersControl.Overlay checked name="Sua empresa">
-          <Marker position={center} icon={unitIcon}><Popup><strong>Sua empresa</strong><br />{result.unidade.nomeFantasia || result.unidade.razaoSocial}<br />{result.unidadeGeo.endereco}</Popup></Marker>
-        </LayersControl.Overlay>
-        <LayersControl.Overlay checked name="Alfinetes Individuais">
-          <>{validPoints.map((point) => <CircleMarker key={point.cep} center={[point.lat, point.lng]} radius={7}><Popup><strong>CEP {formatCep(point.cep)}</strong><br />{point.bairro}, {point.cidade}/{point.uf}<br />Distância: {formatKm(point.distanciaLinhaRetaKm)}</Popup></CircleMarker>)}</>
-        </LayersControl.Overlay>
-        <LayersControl.Overlay name="Agrupado"><ClusterLayer points={validPoints} /></LayersControl.Overlay>
-        <LayersControl.Overlay name="Mapa de Calor"><HeatLayer points={validPoints} /></LayersControl.Overlay>
-        <LayersControl.Overlay checked name="Concorrentes e obstáculos">
-          <>{validPlaces.map((place, index) => <Marker key={`${place.nome}-${index}`} position={[place.lat, place.lng]} icon={place.categoriaEstrategica.includes('Barreira') ? obstacleIcon : placeIcon}><Popup><strong>{place.nome}</strong><br />{place.categoriaEstrategica}<br />{place.subcategoria}<br />{place.competitorType && <><span>Tipo: {place.competitorType}</span><br /></>}{place.rating && <><span>Avaliação: {place.rating.toFixed(1)} ★ ({place.userRatingCount || 0})</span><br /></>}Distância: {formatKm(place.distanciaKm)}<br />Fonte: {place.fonte}<br />Confiabilidade: {place.confiabilidade}<br />{place.observacaoEstrategica}</Popup></Marker>)}</>
-        </LayersControl.Overlay>
-      </LayersControl>
-      <FitBounds center={center} points={validPoints} places={validPlaces} />
-    </MapContainer>
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 text-sm">
+        <LayerToggle checked={showCompany} color="#2563eb" label="Empresa" onChange={setShowCompany} />
+        <LayerToggle checked={showCustomers} color="#2563eb" label="CEPs/clientes" onChange={setShowCustomers} />
+        <LayerToggle checked={showPlaces} color="#0f172a" label="Concorrentes e locais" onChange={setShowPlaces} />
+        <LayerToggle checked={showHeat} color="#f59e0b" label="Calor dos CEPs" onChange={setShowHeat} />
+      </div>
+
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200">
+        <div ref={mapElementRef} className="google-map-canvas" />
+        {status !== 'ready' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-50/90 p-6 text-center text-sm text-slate-600">
+            {status === 'loading' ? 'Carregando Google Maps...' : errorMessage}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+        <LegendDot color="#0f172a" label="Concorrente direto" />
+        <LegendDot color="#475569" label="Concorrente indireto" />
+        <LegendDot color="#f97316" label="Barreira" />
+        <LegendDot color="#7c3aed" label="Polo de público" />
+        <LegendDot color="#16a34a" label="Parceria" />
+      </div>
+    </div>
   );
 }
 
-function FitBounds({ center, points, places }: { center: [number, number]; points: AnalysisResult['points']; places: AnalysisResult['strategicPlaces'] }) {
-  const map = useMap();
-  useEffect(() => {
-    const coords: [number, number][] = [center, ...points.map((p) => [p.lat, p.lng] as [number, number]), ...places.slice(0, 80).map((p) => [p.lat, p.lng] as [number, number])];
-    if (coords.length > 1) map.fitBounds(coords, { padding: [30, 30] });
-  }, [center, map, places, points]);
-  return null;
+function LayerToggle({ checked, color, label, onChange }: { checked: boolean; color: string; label: string; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-700 shadow-sm">
+      <input className="h-4 w-4 accent-orange-500" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+      <span>{label}</span>
+    </label>
+  );
 }
 
-function HeatLayer({ points }: { points: AnalysisResult['points'] }) {
-  const map = useMap();
-  useEffect(() => {
-    let heat: L.Layer | null = null;
-    let cancelled = false;
-    async function run() {
-      await ensureLeafletPluginsLoaded();
-      if (cancelled) return;
-      if (!points.length) return;
-      heat = L.heatLayer(points.map((point) => [point.lat, point.lng, 0.7]), { radius: 28, blur: 20, maxZoom: 17 });
-      heat.addTo(map);
-    }
-    run();
-    return () => { cancelled = true; try { if (heat) heat.remove(); } catch {} };
-  }, [map, points]);
-  return null;
-}
-
-function ClusterLayer({ points }: { points: AnalysisResult['points'] }) {
-  const map = useMap();
-  useEffect(() => {
-    let group: L.MarkerClusterGroup | null = null;
-    let cancelled = false;
-    async function run() {
-      await ensureLeafletPluginsLoaded();
-      if (cancelled) return;
-      group = L.markerClusterGroup({ chunkedLoading: true });
-      points.forEach((point) => {
-        const marker = L.marker([point.lat, point.lng], { icon: placeIcon });
-        marker.bindPopup(`<strong>CEP ${formatCep(point.cep)}</strong><br/>${point.bairro}, ${point.cidade}/${point.uf}<br/>Distância: ${formatKm(point.distanciaLinhaRetaKm)}`);
-        group?.addLayer(marker);
-      });
-      map.addLayer(group);
-    }
-    run();
-    return () => { cancelled = true; try { if (group) map.removeLayer(group); } catch {} };
-  }, [map, points]);
-  return null;
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+      {label}
+    </span>
+  );
 }
