@@ -16,6 +16,10 @@ import type { CategoriaEstrategica, CnaeOption, StrategicPlace, UnidadeNegocio }
 
 const TTL_30_DAYS = 30 * 24 * 60 * 60 * 1000;
 const GOOGLE_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
+const PUBLIC_EMAIL_DOMAINS = new Set(['gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'icloud.com', 'uol.com.br', 'bol.com.br']);
+const LEGAL_NAME_TOKENS = new Set(['ltda', 'limitada', 'eireli', 'mei', 'epp', 'me', 'sa', 's', 'a', 'de', 'da', 'do', 'das', 'dos', 'e']);
+const STREET_NAME_TOKENS = new Set(['rua', 'avenida', 'av', 'r', 'estrada', 'rodovia', 'travessa', 'alameda', 'praca', 'praça', 'largo', 'numero', 'n']);
+const BR_SECOND_LEVEL_DOMAINS = new Set(['com', 'edu', 'org', 'net', 'gov', 'ind', 'inf']);
 
 interface GooglePlace {
   id?: string;
@@ -46,6 +50,144 @@ interface StrategicPlacesResult {
 
 function normalizeText(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function normalizeDigits(value?: string | null) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeSearchText(value?: string | null) {
+  return normalizeText(String(value || '')).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function tokenSet(value?: string | null, ignored = LEGAL_NAME_TOKENS) {
+  return new Set(normalizeSearchText(value).split(' ').filter((token) => token.length >= 3 && !ignored.has(token)));
+}
+
+function samePhone(a?: string | null, b?: string | null) {
+  const left = normalizeDigits(a);
+  const right = normalizeDigits(b);
+  if (left.length < 8 || right.length < 8) return false;
+  return left.slice(-8) === right.slice(-8);
+}
+
+function relevantDomain(value?: string | null) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text.includes('://') ? text : `https://${text}`);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    return PUBLIC_EMAIL_DOMAINS.has(host) ? '' : host;
+  } catch {
+    return '';
+  }
+}
+
+function emailDomain(value?: string | null) {
+  const domain = String(value || '').split('@')[1]?.trim().toLowerCase() || '';
+  return domain && !PUBLIC_EMAIL_DOMAINS.has(domain) ? domain : '';
+}
+
+function rootDomain(domain: string) {
+  const parts = domain.split('.').filter(Boolean);
+  if (parts.length <= 2) return domain;
+  if (parts.at(-1) === 'br' && BR_SECOND_LEVEL_DOMAINS.has(parts.at(-2) || '') && parts.length >= 3) {
+    return parts.slice(-3).join('.');
+  }
+  return parts.slice(-2).join('.');
+}
+
+function sameDomain(a?: string | null, b?: string | null) {
+  const left = relevantDomain(a);
+  const right = relevantDomain(b);
+  if (!left || !right) return false;
+  return left === right || rootDomain(left) === rootDomain(right);
+}
+
+function bestNameMatch(placeName: string, unidade: UnidadeNegocio) {
+  const placeCompact = normalizeSearchText(placeName);
+  const placeTokens = tokenSet(placeName);
+  const candidates = [unidade.nomeFantasia, unidade.razaoSocial].filter(Boolean).map(String);
+  let best = { matches: 0, score: 0, strongContains: false };
+
+  for (const candidate of candidates) {
+    const candidateCompact = normalizeSearchText(candidate);
+    const candidateTokens = tokenSet(candidate);
+    const matches = [...candidateTokens].filter((token) => placeTokens.has(token)).length;
+    const denominator = Math.max(1, Math.min(candidateTokens.size, placeTokens.size));
+    const score = matches / denominator;
+    const strongContains = candidateCompact.length >= 7
+      && placeCompact.length >= 7
+      && (placeCompact.includes(candidateCompact) || candidateCompact.includes(placeCompact));
+    if (score > best.score || strongContains) {
+      best = { matches, score, strongContains };
+    }
+  }
+
+  return best;
+}
+
+function addressMatchesOwnCompany(unidade: UnidadeNegocio, formattedAddress?: string, distanciaKm?: number) {
+  const addressText = normalizeSearchText(formattedAddress);
+  if (!addressText) return false;
+
+  const number = normalizeDigits(unidade.numero);
+  const numberWithoutLeadingZeros = number ? String(Number(number)) : '';
+  const numberVariants = [...new Set([number, numberWithoutLeadingZeros].filter((item) => item && item !== 'NaN'))];
+  const hasNumber = numberVariants.some((item) => new RegExp(`\\b${item}\\b`).test(addressText));
+  const streetTokens = [...tokenSet(unidade.logradouro, STREET_NAME_TOKENS)];
+  const streetMatch = streetTokens.length > 0 && streetTokens.some((token) => addressText.includes(token));
+  const bairroTokens = [...tokenSet(unidade.bairro)];
+  const bairroMatch = bairroTokens.length > 0 && bairroTokens.some((token) => addressText.includes(token));
+  const near = typeof distanciaKm === 'number' && distanciaKm <= 0.18;
+
+  return Boolean((hasNumber && streetMatch && bairroMatch) || (near && hasNumber && (streetMatch || bairroMatch)));
+}
+
+async function websiteMentionsCnpj(websiteUri: string | undefined, cnpj: string) {
+  if (!websiteUri || cnpj.length !== 14) return false;
+  try {
+    const response = await fetchWithTimeout(websiteUri, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MarketIntelligenceBot/1.0)' },
+      redirect: 'follow'
+    }, 5000);
+    if (!response.ok) return false;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType && !/text\/html|text\/plain|application\/xhtml/i.test(contentType)) return false;
+    const text = (await response.text()).slice(0, 250000);
+    return normalizeDigits(text).includes(cnpj);
+  } catch {
+    return false;
+  }
+}
+
+async function ownCompanyMatchReason(input: {
+  unidade: UnidadeNegocio;
+  place: GooglePlace;
+  nome: string;
+  distanciaKm: number;
+  allowWebsiteCheck: boolean;
+}) {
+  // A Places API nao retorna CNPJ. Por isso removemos a propria empresa usando sinais fortes:
+  // telefone, endereco/coordenada, dominio do site/e-mail, nome publico e, quando possivel, CNPJ no site retornado pelo Google.
+  const { unidade, place, nome, distanciaKm, allowWebsiteCheck } = input;
+  if (samePhone(unidade.telefone, place.nationalPhoneNumber)) return 'telefone igual ao CNPJ';
+
+  const nameMatch = bestNameMatch(nome, unidade);
+  const addressMatch = addressMatchesOwnCompany(unidade, place.formattedAddress, distanciaKm);
+  const unitEmailDomain = emailDomain(unidade.email);
+  const domainMatch = unitEmailDomain ? sameDomain(place.websiteUri, unitEmailDomain) : false;
+  const likelyOwnCandidate = addressMatch || domainMatch || nameMatch.strongContains || (nameMatch.score >= 0.7 && nameMatch.matches >= 2);
+
+  if (allowWebsiteCheck && likelyOwnCandidate && await websiteMentionsCnpj(place.websiteUri, normalizeDigits(unidade.cnpj))) {
+    return 'site retornado pelo Google contem o mesmo CNPJ';
+  }
+  if (addressMatch && (nameMatch.score >= 0.45 || nameMatch.strongContains)) return 'nome e endereco conferem com a empresa analisada';
+  if (addressMatch && distanciaKm <= 0.08) return 'endereco e coordenadas conferem com a empresa analisada';
+  if (domainMatch && (nameMatch.score >= 0.45 || addressMatch)) return 'dominio do site/e-mail confere com a empresa analisada';
+  if ((nameMatch.strongContains || (nameMatch.score >= 0.8 && nameMatch.matches >= 2)) && distanciaKm <= 0.15) return 'nome publico e coordenadas conferem com a empresa analisada';
+
+  return '';
 }
 
 function categoryFromHint(hint: CompetitorTypeConfig['strategicCategoryHint']): CategoriaEstrategica {
@@ -245,7 +387,7 @@ export async function getStrategicPlaces(input: {
   const activityKey = normalizeText(activityDescription).slice(0, 120);
   const cnaeKey = selectedCnaes.map((cnae) => `${cnae.codigo}-${cnae.descricao}`).sort().join('|');
   const typeKey = [...competitorTypes].sort().join('|');
-  const cacheKey = `google:v2:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}:${activityKey}`;
+  const cacheKey = `google:v3:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}:${activityKey}`;
   const cached = await prisma.placesCache.findFirst({ where: { cacheKey, expiresAt: { gt: new Date() } } });
   if (cached) {
     const cachedPlaces = cached.resultsJson as unknown as StrategicPlace[];
@@ -264,6 +406,9 @@ export async function getStrategicPlaces(input: {
   const ownNames = [input.unidade.razaoSocial, input.unidade.nomeFantasia].filter(Boolean).map((value) => normalizeText(String(value)));
   const seen = new Set<string>();
   const places: StrategicPlace[] = [];
+  let skippedOwnCompany = 0;
+  let ownWebsiteChecks = 0;
+  const ownCompanyReasons = new Set<string>();
   const scopeForDiagnostics = [
     activityDescription,
     ...selectedCnaes.map((cnae) => cnae.descricao)
@@ -277,12 +422,34 @@ export async function getStrategicPlaces(input: {
     for (const place of googlePlaces) {
       const nome = place.displayName?.text || 'Local sem nome';
       const normalizedName = normalizeText(nome);
-      if (ownNames.some((own) => own && normalizedName.includes(own))) continue;
+      if (ownNames.some((own) => own && own.length >= 8 && normalizedName.includes(own))) {
+        skippedOwnCompany += 1;
+        ownCompanyReasons.add('nome igual ao cadastro do CNPJ');
+        continue;
+      }
       const lat = place.location?.latitude;
       const lng = place.location?.longitude;
       if (typeof lat !== 'number' || typeof lng !== 'number') continue;
       const distanciaKm = Number(haversineKm(input.center, { lat, lng }).toFixed(2));
       if (distanciaKm > radiusM / 1000) continue;
+      const lightweightNameMatch = bestNameMatch(nome, input.unidade);
+      const lightweightAddressMatch = addressMatchesOwnCompany(input.unidade, place.formattedAddress, distanciaKm);
+      const shouldCheckWebsite = Boolean(place.websiteUri)
+        && ownWebsiteChecks < 3
+        && (lightweightAddressMatch || lightweightNameMatch.strongContains || (lightweightNameMatch.score >= 0.55 && lightweightNameMatch.matches >= 2));
+      if (shouldCheckWebsite) ownWebsiteChecks += 1;
+      const ownReason = await ownCompanyMatchReason({
+        unidade: input.unidade,
+        place,
+        nome,
+        distanciaKm,
+        allowWebsiteCheck: shouldCheckWebsite
+      });
+      if (ownReason) {
+        skippedOwnCompany += 1;
+        ownCompanyReasons.add(ownReason);
+        continue;
+      }
       const dedupKey = place.id || `${normalizedName}:${lat.toFixed(5)}:${lng.toFixed(5)}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
@@ -321,6 +488,9 @@ export async function getStrategicPlaces(input: {
     .slice(0, 200);
 
   if (!sorted.length) {
+    if (skippedOwnCompany) {
+      diagnostics.push(`Google Places: ${skippedOwnCompany} resultado(s) ignorado(s) por parecerem ser a própria empresa analisada (${[...ownCompanyReasons].slice(0, 3).join('; ')}).`);
+    }
     diagnostics.push('Google Places executou, mas não retornou locais aproveitáveis para os termos, raio e coordenadas desta análise. Nenhum resultado vazio foi gravado no cache.');
     return { places: [], diagnostics };
   }
@@ -338,7 +508,10 @@ export async function getStrategicPlaces(input: {
     }
   });
 
-  diagnostics.push(`Google Places retornou ${sorted.length} local(is) relevante(s) depois de filtros de raio, duplicidade e nome da própria empresa.`);
+  if (skippedOwnCompany) {
+    diagnostics.push(`Google Places: ${skippedOwnCompany} resultado(s) ignorado(s) por parecerem ser a própria empresa analisada (${[...ownCompanyReasons].slice(0, 3).join('; ')}).`);
+  }
+  diagnostics.push(`Google Places retornou ${sorted.length} local(is) relevante(s) depois de filtros de raio, duplicidade e identificação da própria empresa.`);
   return { places: sorted, diagnostics };
 }
 

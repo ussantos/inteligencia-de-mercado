@@ -397,6 +397,8 @@ A chave deve ser server-side em `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_A
 
 As consultas ao Google Places sao montadas a partir do escopo escolhido pelo usuario: CNAEs selecionados, descricao opcional do ramo de atividade e tipos de concorrentes. O CNAE principal cadastral do CNPJ e usado como fallback apenas quando o usuario nao escolhe CNAE nem descreve o ramo manualmente.
 
+O Google Places nao retorna CNPJ diretamente. Para evitar listar a propria empresa como concorrente, a aplicacao cruza os resultados do Google com os dados do CNPJ analisado usando telefone, endereco, coordenadas, dominio do site/e-mail, similaridade de nome e, quando o site do resultado esta disponivel, busca o CNPJ da empresa na pagina retornada. Resultados identificados como a propria empresa sao removidos antes do relatorio.
+
 Se o diagnostico mostrar `API_KEY_HTTP_REFERRER_BLOCKED`, a chave usada no backend esta restrita por site/referrer. Crie uma chave separada para o servidor, permita a **Places API** nas restricoes de API e nao aplique restricao de HTTP referrer nessa chave. Depois cadastre essa chave no Azure Static Web Apps e nos secrets do GitHub como `GOOGLE_MAPS_SERVER_API_KEY` ou substitua `GOOGLE_PLACES_API_KEY`.
 
 A aplicacao nao grava cache vazio quando a chave Google esta ausente. Assim, depois que a chave e configurada, a proxima analise chama o Google Places de verdade.
@@ -944,6 +946,8 @@ https://places.googleapis.com/v1/places:searchText
 The key must be server-side in `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`. The public `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` is only for browser maps and must not be used by the backend to search competitors. The API must be enabled in Google Cloud and billing must be active.
 
 Google Places queries are built from the scope selected by the user: selected CNAEs, optional business activity description, and competitor types. The company's main registered CNAE is used as a fallback only when the user does not select any CNAE and does not manually describe the activity.
+
+Google Places does not return CNPJ directly. To avoid listing the analyzed company as its own competitor, the application cross-checks Google results against the CNPJ record using phone number, address, coordinates, website/email domain, name similarity, and, when the result website is available, scans the returned page for the company's CNPJ. Results identified as the same company are removed before the report is generated.
 
 If diagnostics show `API_KEY_HTTP_REFERRER_BLOCKED`, the backend key is restricted by site/referrer. Create a separate server key, allow **Places API** in API restrictions, and do not apply HTTP referrer restrictions to that key. Then register it in Azure Static Web Apps and GitHub Secrets as `GOOGLE_MAPS_SERVER_API_KEY`, or replace `GOOGLE_PLACES_API_KEY`.
 
