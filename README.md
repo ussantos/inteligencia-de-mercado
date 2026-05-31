@@ -14,6 +14,10 @@ A ferramenta foi criada como projeto aplicado inspirado nos conceitos apresentad
 
 O codigo-fonte esta disponivel no GitHub em [ussantos/inteligencia-de-mercado](https://github.com/ussantos/inteligencia-de-mercado) sob a licenca [GNU GPL](https://www.gnu.org/licenses/gpl-3.0.html).
 
+Este sistema nao e um produto comercial vendido, licenciado ou garantido pela My Robot Barra da Tijuca, por seus responsaveis ou por seus colaboradores. O codigo e disponibilizado sem garantia de funcionamento, continuidade, seguranca, adequacao tecnica ou adequacao juridica, trabalhista, fiscal, contabil e de protecao de dados.
+
+Qualquer uso por outras empresas, franquias, negocios, organizacoes ou terceiros ocorre por conta e risco proprios. Antes de usar, adaptar ou implantar este sistema, cada organizacao deve validar a aplicacao com seus responsaveis tecnicos, juridicos, contabeis, trabalhistas e de protecao de dados.
+
 ## LGPD e privacidade
 
 A aplicacao deve ser usada com atencao a LGPD. O fluxo foi desenhado para processar temporariamente apenas os dados necessarios para a analise regional. No upload de planilhas, apenas CEPs sao usados; nomes, telefones, e-mails, CPF e outros dados pessoais devem ser evitados e, quando presentes, sao ignorados pela aplicacao.
