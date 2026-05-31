@@ -33,6 +33,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Consulta de empresa por CNPJ usando fontes publicas, com cache em Postgres.
 - Identificacao automatica de endereco, CEP e CNAEs.
 - Selecao de CNAEs e tipos de concorrentes/alternativas de mercado.
+- Descricao opcional do ramo de atividade para refinar a busca quando o CNAE for generico ou incompleto.
 - Analise por raio em torno do empreendimento, com padrao de 8 km.
 - Upload opcional de CSV/XLSX com CEPs de clientes.
 - Exclusao do arquivo temporario do Azure Blob Storage depois que a analise termina com sucesso.
@@ -41,10 +42,10 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Geocodificacao com LocationIQ e fallback Nominatim.
 - Distancia por linha reta e, quando configurado, rota com OpenRouteService.
 - Busca de concorrentes e locais relevantes via Google Places API.
-- Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras, locais relevantes e calor dos CEPs.
+- Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras e locais relevantes.
 - Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, evolucao incremental e plano de acao.
-- Impressao da analise pelo navegador, permitindo imprimir em papel ou salvar como PDF.
+- Impressao da analise pelo navegador, com folha A4 em modo paisagem e margens estreitas para salvar em PDF ou imprimir em papel.
 - Historico e compartilhamento de analises.
 - Autenticacao Clerk protegendo a aplicacao principal na raiz `/`.
 
@@ -237,7 +238,7 @@ Configure:
 
 ### Google Maps JavaScript API
 
-Uso no projeto: mapa visual do relatorio, camadas, marcadores e mapa de calor.
+Uso no projeto: mapa visual do relatorio, camadas e marcadores de empresa, CEPs, concorrentes e locais relevantes.
 
 Leia principalmente:
 

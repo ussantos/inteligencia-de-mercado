@@ -179,15 +179,17 @@ function buildSearchJobs(input: {
   unidade: UnidadeNegocio;
   competitorTypes: CompetitorType[];
   selectedCnaes: CnaeOption[];
+  businessActivityDescription?: string;
 }): Array<{ query: string; config: CompetitorTypeConfig; competitorType: CompetitorType }> {
   // Um "job" e uma busca que sera enviada ao Google.
   // Criamos varias buscas combinando tipo de concorrente, CNAE e cidade.
   const configs = getConfigsForCompetitorTypes(input.competitorTypes);
   const municipioUf = `${input.unidade.municipio} ${input.unidade.uf}`.trim();
   const businessTerms = [
+    input.businessActivityDescription,
     input.unidade.cnaePrincipalDescricao,
     ...input.selectedCnaes.map((cnae) => cnae.descricao)
-  ].filter(Boolean).slice(0, 5);
+  ].map((term) => String(term || '').trim()).filter(Boolean).slice(0, 6);
   const cnaeTerms = input.selectedCnaes
     .map((cnae) => cnae.descricao)
     .filter(Boolean)
@@ -225,6 +227,7 @@ export async function getStrategicPlaces(input: {
   unidade: UnidadeNegocio;
   competitorTypes?: CompetitorType[];
   selectedCnaes?: CnaeOption[];
+  businessActivityDescription?: string;
   radiusKm?: number;
 }): Promise<StrategicPlacesResult> {
   // Esta funcao coordena a busca de locais.
@@ -232,9 +235,10 @@ export async function getStrategicPlaces(input: {
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
   const selectedCnaes = input.selectedCnaes?.length ? input.selectedCnaes : input.unidade.cnaes;
   const radiusM = Math.max(1000, Math.min(50000, Math.round((input.radiusKm || 8) * 1000)));
+  const activityKey = normalizeText(input.businessActivityDescription || '').slice(0, 120);
   const cnaeKey = selectedCnaes.map((cnae) => `${cnae.codigo}-${cnae.descricao}`).sort().join('|');
   const typeKey = [...competitorTypes].sort().join('|');
-  const cacheKey = `google:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}`;
+  const cacheKey = `google:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}:${activityKey}`;
   const cached = await prisma.placesCache.findFirst({ where: { cacheKey, expiresAt: { gt: new Date() } } });
   if (cached) {
     const cachedPlaces = cached.resultsJson as unknown as StrategicPlace[];
@@ -249,7 +253,7 @@ export async function getStrategicPlaces(input: {
   }
 
   const maxSearches = Number(process.env.GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS || 24);
-  const jobs = buildSearchJobs({ unidade: input.unidade, competitorTypes, selectedCnaes }).slice(0, Math.max(1, maxSearches));
+  const jobs = buildSearchJobs({ unidade: input.unidade, competitorTypes, selectedCnaes, businessActivityDescription: input.businessActivityDescription }).slice(0, Math.max(1, maxSearches));
   const ownNames = [input.unidade.razaoSocial, input.unidade.nomeFantasia].filter(Boolean).map((value) => normalizeText(String(value)));
   const seen = new Set<string>();
   const places: StrategicPlace[] = [];

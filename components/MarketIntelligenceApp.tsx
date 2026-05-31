@@ -138,6 +138,7 @@ export function MarketIntelligenceApp() {
   const [cnpj, setCnpj] = useState('');
   const [unidade, setUnidade] = useState<UnidadeNegocio | null>(null);
   const [selectedCnaes, setSelectedCnaes] = useState<CnaeOption[]>([]);
+  const [businessActivityDescription, setBusinessActivityDescription] = useState('');
   const [competitorTypes, setCompetitorTypes] = useState<CompetitorType[]>(DEFAULT_COMPETITOR_TYPES);
   const [analysisRadiusKm, setAnalysisRadiusKm] = useState(8);
   const [ceps, setCeps] = useState<string[]>([]);
@@ -239,6 +240,7 @@ export function MarketIntelligenceApp() {
     setLoadingCnpj(true);
     setGlobalError(null);
     setUnidade(null);
+    setBusinessActivityDescription('');
     try {
       const response = await fetch('/api/cnpj', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ cnpj }) });
       const json = await response.json();
@@ -319,7 +321,7 @@ export function MarketIntelligenceApp() {
         method: 'POST',
         credentials: 'include',
         headers: await jsonAuthHeaders(),
-        body: JSON.stringify({ unidade, ceps: uniqueCeps, selectedCnaes, competitorTypes, analysisRadiusKm: radiusKm })
+        body: JSON.stringify({ unidade, ceps: uniqueCeps, selectedCnaes, businessActivityDescription, competitorTypes, analysisRadiusKm: radiusKm })
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
@@ -413,6 +415,23 @@ export function MarketIntelligenceApp() {
               <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha os CNAEs que melhor representam a análise</h2>
               <p className="mt-2 text-sm text-slate-500">A lista é gerada automaticamente a partir do CNPJ. Os CNAEs selecionados ajudam a montar buscas no Google Places e a contextualizar a análise.</p>
               {!unidade ? <p className="mt-4 text-sm text-slate-500">Carregue os dados da empresa pelo CNPJ para continuar e listar os CNAEs.</p> : <div className="mt-4 grid gap-3">{allCnaes.map((cnae) => <label key={cnaeKey(cnae)} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 hover:bg-slate-50"><input type="checkbox" checked={selectedCnaes.some((item) => cnaeKey(item) === cnaeKey(cnae))} onChange={() => toggleCnae(cnae)} className="mt-1 h-4 w-4" /><span><strong>{cnae.tipo}</strong> · {cnae.codigo ? `${cnae.codigo} — ` : ''}{cnae.descricao}</span></label>)}</div>}
+              {unidade && (
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Descrição opcional do ramo de atividade</label>
+                  <p className="mt-1 text-sm text-slate-500">Use este campo se o CNAE for genérico ou não explicar bem o que a empresa vende. Exemplo: “curso presencial de robótica e programação para crianças”. A descrição será usada para melhorar a busca de concorrentes no Google Places.</p>
+                  <textarea
+                    id="business-activity-description"
+                    value={businessActivityDescription}
+                    onChange={(event) => setBusinessActivityDescription(event.target.value.slice(0, 300))}
+                    placeholder="Descreva em uma frase o que a empresa oferece, para quem e como compete..."
+                    className="mt-3 min-h-28 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  />
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                    <span>Opcional. Se preenchido, será combinado com os CNAEs na busca de concorrentes.</span>
+                    <span>{businessActivityDescription.length}/300</span>
+                  </div>
+                </div>
+              )}
             </Card>
 
             <Card>
@@ -423,10 +442,16 @@ export function MarketIntelligenceApp() {
               </p>
               {unidade ? (
                 <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm text-blue-900">
-                  Sugestões baseadas em: {selectedCnaes.length ? selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : unidade.cnaePrincipalDescricao}.
+                  Sugestões baseadas em: {selectedCnaes.length ? selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : unidade.cnaePrincipalDescricao}
+                  {businessActivityDescription.trim() ? ` · descrição informada: ${businessActivityDescription.trim()}` : ''}.
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-slate-500">Carregue o CNPJ para receber sugestões de concorrentes ligadas aos CNAEs da empresa.</p>
+              )}
+              {businessActivityDescription.trim() && (
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                  Busca adicional ativada: a análise também vai procurar concorrentes, alternativas e locais relacionados a “{businessActivityDescription.trim()}”, além dos CNAEs selecionados.
+                </div>
               )}
               <div className="mt-4 grid gap-2 md:grid-cols-2">
                 {competitorOptions.map((option) => <label key={option.type} className={`flex cursor-pointer gap-3 rounded-2xl border p-3 text-sm hover:bg-slate-50 ${option.suggested ? 'border-orange-200 bg-orange-50/40' : 'border-slate-200'}`}><input type="checkbox" checked={competitorTypes.includes(option.type)} onChange={() => toggleCompetitorType(option.type)} className="mt-1 h-4 w-4" /><span><span className="font-semibold text-slate-900">{option.type}</span>{option.suggested && <Badge className="ml-2 bg-orange-100 text-orange-700">Sugerido</Badge>}<span className="mt-1 block text-xs leading-5 text-slate-500">{option.reason}</span></span></label>)}
@@ -468,7 +493,7 @@ export function MarketIntelligenceApp() {
                 <div>
                   <Badge className="bg-orange-100 text-orange-700">5 — Iniciar</Badge>
                   <h2 className="mt-3 text-2xl font-bold text-slate-900">Iniciar análise da região</h2>
-                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, os CNAEs selecionados, os tipos de concorrentes, o raio de {safeAnalysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
+                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, os CNAEs selecionados, a descrição opcional do ramo, os tipos de concorrentes, o raio de {safeAnalysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
                 </div>
                 <Button className="min-w-56" onClick={startAnalysis} disabled={!canAnalyze}>{loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />} Iniciar análise</Button>
               </div>

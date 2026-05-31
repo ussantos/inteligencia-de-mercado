@@ -119,6 +119,7 @@ export interface AnalysisResult {
   createdAt: string;
   domain: DomainOption;
   selectedCnaes: CnaeOption[];
+  businessActivityDescription?: string;
   competitorTypes: CompetitorType[];
   analysisRadiusKm: number;
   unidade: UnidadeNegocio;

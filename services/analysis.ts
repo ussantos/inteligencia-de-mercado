@@ -290,6 +290,7 @@ export async function runMarketAnalysis(input: {
   unidade: UnidadeNegocio;
   ceps?: string[];
   selectedCnaes?: CnaeOption[];
+  businessActivityDescription?: string;
   competitorTypes?: CompetitorType[];
   analysisRadiusKm?: number;
 }): Promise<AnalysisResult> {
@@ -300,8 +301,12 @@ export async function runMarketAnalysis(input: {
   const invalidCeps = rawCeps.map(String).filter((cep) => cep.trim() && !isValidCep(cep));
   const analysisRadiusKm = Math.max(1, Math.min(50, Number(input.analysisRadiusKm || 8)));
   const selectedCnaes = input.selectedCnaes?.length ? input.selectedCnaes : input.unidade.cnaes.slice(0, 3);
+  const businessActivityDescription = String(input.businessActivityDescription || '').trim().slice(0, 300);
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
-  const domain = selectedCnaes.map((cnae) => `${cnae.codigo ? `${cnae.codigo} — ` : ''}${cnae.descricao}`).join(' | ') || input.unidade.cnaePrincipalDescricao;
+  const domain = [
+    businessActivityDescription ? `Descrição informada: ${businessActivityDescription}` : '',
+    selectedCnaes.map((cnae) => `${cnae.codigo ? `${cnae.codigo} — ` : ''}${cnae.descricao}`).join(' | ') || input.unidade.cnaePrincipalDescricao
+  ].filter(Boolean).join(' | ');
 
   const unitGeo = await geocodeCep(input.unidade.cep);
   if (!unitGeo) throw new Error('Não foi possível geocodificar o CEP da empresa obtido pelo CNPJ.');
@@ -333,6 +338,7 @@ export async function runMarketAnalysis(input: {
     unidade: input.unidade,
     competitorTypes,
     selectedCnaes,
+    businessActivityDescription,
     radiusKm: analysisRadiusKm
   });
   const strategicPlaces = strategicPlacesResult.places;
@@ -354,6 +360,7 @@ export async function runMarketAnalysis(input: {
     createdAt: today.toISOString(),
     domain,
     selectedCnaes,
+    businessActivityDescription: businessActivityDescription || undefined,
     competitorTypes,
     analysisRadiusKm,
     unidade: input.unidade,
@@ -381,7 +388,7 @@ export async function runMarketAnalysis(input: {
     obstaculosMatricula: buildObstacles(neighborhoodScores, strategicPlaces, analysisRadiusKm),
     posicionamentoUnidade: {
       forcasAtuais: [
-        `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com CNAE principal ${input.unidade.cnaePrincipalCodigo} — ${input.unidade.cnaePrincipalDescricao}.`,
+        `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com CNAE principal ${input.unidade.cnaePrincipalCodigo} — ${input.unidade.cnaePrincipalDescricao}${businessActivityDescription ? `, complementado pela descrição informada: ${businessActivityDescription}.` : '.'}`,
         'A análise considera a região real da empresa detectada pelo CNPJ, e não um território genérico.',
         'Atendimento consultivo, prova social, clareza de oferta e conveniência local são ativos importantes para conversão.'
       ],

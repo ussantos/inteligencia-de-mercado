@@ -31,7 +31,45 @@ body {
 }
 
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .no-print {
     display: none !important;
+  }
+
+  main,
+  #analysis-report {
+    width: 100% !important;
+    max-width: none !important;
+    background: #ffffff !important;
+  }
+
+  #analysis-report section,
+  #analysis-report article,
+  #analysis-report .rounded-3xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .google-map-canvas {
+    min-height: 360px;
+  }
+
+  .rounded-3xl,
+  .rounded-2xl {
+    box-shadow: none !important;
   }
 }

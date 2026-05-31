@@ -43,8 +43,7 @@ function loadGoogleMaps(apiKey: string) {
   if (!googleWindow.__googleMapsPromise) {
     googleWindow.__googleMapsPromise = new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
-      const libraries = 'visualization';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=${libraries}&language=pt-BR&region=BR`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&language=pt-BR&region=BR`;
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
@@ -94,7 +93,6 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
   const [showCompany, setShowCompany] = useState(true);
   const [showCustomers, setShowCustomers] = useState(true);
   const [showPlaces, setShowPlaces] = useState(true);
-  const [showHeat, setShowHeat] = useState(false);
 
   const center = useMemo(() => {
     if (!isValidCoord(result.unidadeGeo.lat, result.unidadeGeo.lng)) return null;
@@ -200,16 +198,6 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       });
     }
 
-    if (showHeat && validPoints.length && google.maps.visualization?.HeatmapLayer) {
-      const heat = new google.maps.visualization.HeatmapLayer({
-        data: validPoints.map((point) => ({ location: new google.maps.LatLng(point.lat, point.lng), weight: 0.7 })),
-        radius: 28,
-        opacity: 0.65,
-        map
-      });
-      overlaysRef.current.push(heat);
-    }
-
     if (showPlaces) {
       validPlaces.slice(0, 120).forEach((place) => {
         const position = { lat: place.lat, lng: place.lng };
@@ -241,7 +229,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       map.setCenter(center);
       map.setZoom(12);
     }
-  }, [center, result.unidade.nomeFantasia, result.unidade.razaoSocial, result.unidadeGeo.endereco, showCompany, showCustomers, showHeat, showPlaces, status, validPlaces, validPoints]);
+  }, [center, result.unidade.nomeFantasia, result.unidade.razaoSocial, result.unidadeGeo.endereco, showCompany, showCustomers, showPlaces, status, validPlaces, validPoints]);
 
   if (!center) {
     return (
@@ -257,7 +245,6 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
         <LayerToggle checked={showCompany} color="#2563eb" label="Empresa" onChange={setShowCompany} />
         <LayerToggle checked={showCustomers} color="#2563eb" label="CEPs/clientes" onChange={setShowCustomers} />
         <LayerToggle checked={showPlaces} color="#0f172a" label="Concorrentes e locais" onChange={setShowPlaces} />
-        <LayerToggle checked={showHeat} color="#f59e0b" label="Calor dos CEPs" onChange={setShowHeat} />
       </div>
 
       <div className="relative overflow-hidden rounded-2xl border border-slate-200">

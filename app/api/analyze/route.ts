@@ -19,6 +19,7 @@ const schema = z.object({
   unidade: z.any(),
   ceps: z.array(z.string()).optional().default([]),
   selectedCnaes: z.array(cnaeSchema).optional().default([]),
+  businessActivityDescription: z.string().trim().max(300).optional().default(''),
   competitorTypes: z.array(z.string()).optional().default(DEFAULT_COMPETITOR_TYPES).transform((items) => items.filter(isCompetitorType) as CompetitorType[]),
   analysisRadiusKm: z.coerce.number().min(1).max(50).optional().default(8),
   // Campos legados aceitos para não quebrar relatórios/cliente antigo.
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       unidade: body.unidade,
       ceps: body.ceps,
       selectedCnaes: body.selectedCnaes as CnaeOption[],
+      businessActivityDescription: body.businessActivityDescription,
       competitorTypes,
       analysisRadiusKm: body.analysisRadiusKm
     });
