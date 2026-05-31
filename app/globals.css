@@ -30,10 +30,14 @@ body {
   overflow: hidden;
 }
 
+.print-report {
+  display: none;
+}
+
 @media print {
   @page {
-    size: A4 landscape;
-    margin: 8mm;
+    size: A4 portrait;
+    margin: 11mm;
   }
 
   html,
@@ -50,6 +54,14 @@ body {
     display: none !important;
   }
 
+  .report-shell {
+    display: block !important;
+  }
+
+  .screen-report {
+    display: none !important;
+  }
+
   main,
   #analysis-report {
     width: 100% !important;
@@ -57,11 +69,206 @@ body {
     background: #ffffff !important;
   }
 
-  #analysis-report section,
-  #analysis-report article,
-  #analysis-report .rounded-3xl {
+  .print-report {
+    display: block !important;
+    color: #111827;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9.4pt;
+    line-height: 1.38;
+  }
+
+  .print-report h1,
+  .print-report h2,
+  .print-report h3,
+  .print-report p {
+    margin: 0;
+  }
+
+  .print-page {
+    min-height: 270mm;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-cover {
+    display: flex;
+    flex-direction: column;
+    gap: 8mm;
+  }
+
+  .print-header {
+    align-items: flex-start;
+    border-bottom: 1px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 5mm;
+  }
+
+  .print-kicker {
+    color: #f97316;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .print-header h1,
+  .print-page h2 {
+    color: #020617;
+    font-size: 20pt;
+    line-height: 1.08;
+    margin-top: 2mm;
+  }
+
+  .print-date {
+    color: #475569;
+    display: grid;
+    font-size: 9pt;
+    gap: 1mm;
+    text-align: right;
+  }
+
+  .print-summary {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 5mm;
+    padding: 5mm;
+  }
+
+  .print-summary span {
+    color: #c2410c;
+    display: block;
+    font-size: 11pt;
+    font-weight: 700;
+    margin-bottom: 2mm;
+  }
+
+  .print-metrics-grid {
+    display: grid;
+    gap: 3mm;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .print-metric {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4mm;
+    padding: 4mm;
+  }
+
+  .print-metric span {
+    color: #64748b;
+    display: block;
+    font-size: 8.5pt;
+  }
+
+  .print-metric strong {
+    color: #020617;
+    display: block;
+    font-size: 15pt;
+    margin-top: 1mm;
+  }
+
+  .print-two-columns,
+  .print-swot {
+    display: grid;
+    gap: 4mm;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 5mm;
+  }
+
+  .print-block {
+    border: 1px solid #dbe4ef;
+    border-radius: 4mm;
     break-inside: avoid;
     page-break-inside: avoid;
+    padding: 4mm;
+  }
+
+  .print-page > .print-block,
+  .print-page > h2 + .print-block,
+  .print-page > h2 + .print-two-columns,
+  .print-page > h2 + .print-swot {
+    margin-top: 5mm;
+  }
+
+  .print-block + .print-block,
+  .print-two-columns + .print-block,
+  .print-swot + .print-block {
+    margin-top: 4mm;
+  }
+
+  .print-block h3 {
+    color: #0f172a;
+    font-size: 12pt;
+    margin-bottom: 2mm;
+  }
+
+  .print-block p,
+  .print-list,
+  .print-table {
+    color: #334155;
+    font-size: 9.2pt;
+  }
+
+  .print-list,
+  .print-diagnostics {
+    margin: 0;
+    padding-left: 4mm;
+  }
+
+  .print-list li,
+  .print-diagnostics li {
+    margin-bottom: 1.5mm;
+  }
+
+  .print-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .print-table th,
+  .print-table td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 2mm;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-table th {
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  .print-places-table th,
+  .print-places-table td {
+    font-size: 8.3pt;
+  }
+
+  .print-ranking-item,
+  .print-action-item {
+    border-bottom: 1px solid #e2e8f0;
+    break-inside: avoid;
+    margin-bottom: 2.5mm;
+    padding-bottom: 2.5mm;
+    page-break-inside: avoid;
+  }
+
+  .print-ranking-item:last-child,
+  .print-action-item:last-child {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .print-ranking-item strong,
+  .print-action-item strong {
+    color: #0f172a;
   }
 
   .google-map-canvas {

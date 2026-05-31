@@ -16,7 +16,7 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
 
   async function exportPdf() {
     // O PDF e criado tirando uma "foto" da area do relatorio e colocando essa imagem em uma pagina A4.
-    const element = document.getElementById('analysis-report');
+    const element = document.getElementById('analysis-report-screen') || document.getElementById('analysis-report');
     if (!element) return;
     const canvas = await html2canvas(element, { scale: 1.5, useCORS: true });
     const imgData = canvas.toDataURL('image/png');

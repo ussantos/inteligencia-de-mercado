@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { AlertTriangle, MessageSquareText, Printer, Sparkles, Star } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge, Card } from '@/components/ui';
+import { PrintableReport } from '@/components/PrintableReport';
 import type { AnalysisResult } from '@/lib/types';
 import { formatKm } from '@/lib/utils';
 
@@ -74,7 +75,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+    <div className="report-shell grid gap-6 lg:grid-cols-[260px_1fr]">
       <aside className="no-print hidden lg:block">
         <Card className="sticky top-24">
           <h2 className="font-bold text-slate-900">Navegação da Análise</h2>
@@ -88,7 +89,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         </Card>
       </aside>
 
-      <div id="analysis-report" className="space-y-6">
+      <div id="analysis-report-screen" className="screen-report space-y-6">
         <section id="fase">
           <Card>
             <Badge className={faseColor}>{result.faseMercadoLocal.fase}</Badge>
@@ -355,6 +356,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
           </Card>
         </section>
       </div>
+      <PrintableReport result={result} />
     </div>
   );
 }
