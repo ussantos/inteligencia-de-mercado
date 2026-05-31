@@ -7,6 +7,9 @@ import type { ReactNode } from 'react';
 import { formatKm } from '@/lib/utils';
 
 const PRINT_CHART_COLORS = ['#2563eb', '#16a34a', '#f97316', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#be185d'];
+const PRINT_MAP_WIDTH = 1024;
+const PRINT_MAP_HEIGHT = 512;
+const PRINT_MAP_TILE_SIZE = 256;
 
 function starLabel(rating?: number | null, count?: number | null) {
   if (!rating) return 'Sem avaliacao Google';
@@ -32,28 +35,80 @@ function mapCategoryColor(category: string) {
   return '#0891b2';
 }
 
+function estimatePrintMapZoom(radiusKm: number) {
+  if (radiusKm <= 3) return 14;
+  if (radiusKm <= 7) return 13;
+  if (radiusKm <= 15) return 12;
+  if (radiusKm <= 30) return 11;
+  return 10;
+}
+
+function latLngToWorldPixel(lat: number, lng: number, zoom: number) {
+  // A imagem estatica do OSM usa Web Mercator; esta conta transforma latitude/longitude
+  // em pixels no mesmo sistema para posicionarmos os marcadores sobre a imagem impressa.
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const scale = 256 * 2 ** zoom;
+  return {
+    x: ((lng + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale
+  };
+}
+
+function buildPrintMapContext(result: AnalysisResult) {
+  const zoom = estimatePrintMapZoom(result.analysisRadiusKm);
+  const center = latLngToWorldPixel(result.unidadeGeo.lat, result.unidadeGeo.lng, zoom);
+  return {
+    zoom,
+    topLeftX: center.x - PRINT_MAP_WIDTH / 2,
+    topLeftY: center.y - PRINT_MAP_HEIGHT / 2
+  };
+}
+
+function buildPrintMapTiles(result: AnalysisResult) {
+  const { zoom, topLeftX, topLeftY } = buildPrintMapContext(result);
+  const startX = Math.floor(topLeftX / PRINT_MAP_TILE_SIZE);
+  const endX = Math.floor((topLeftX + PRINT_MAP_WIDTH) / PRINT_MAP_TILE_SIZE);
+  const startY = Math.floor(topLeftY / PRINT_MAP_TILE_SIZE);
+  const endY = Math.floor((topLeftY + PRINT_MAP_HEIGHT) / PRINT_MAP_TILE_SIZE);
+  const maxTile = 2 ** zoom;
+  const subdomains = ['a', 'b', 'c'];
+  const tiles: Array<{ key: string; url: string; left: number; top: number; width: number; height: number }> = [];
+
+  for (let x = startX; x <= endX; x += 1) {
+    for (let y = startY; y <= endY; y += 1) {
+      if (y < 0 || y >= maxTile) continue;
+      const wrappedX = ((x % maxTile) + maxTile) % maxTile;
+      const subdomain = subdomains[Math.abs(x + y) % subdomains.length];
+      tiles.push({
+        key: `${zoom}-${wrappedX}-${y}`,
+        url: `https://${subdomain}.tile.openstreetmap.org/${zoom}/${wrappedX}/${y}.png`,
+        left: ((x * PRINT_MAP_TILE_SIZE - topLeftX) / PRINT_MAP_WIDTH) * 100,
+        top: ((y * PRINT_MAP_TILE_SIZE - topLeftY) / PRINT_MAP_HEIGHT) * 100,
+        width: (PRINT_MAP_TILE_SIZE / PRINT_MAP_WIDTH) * 100,
+        height: (PRINT_MAP_TILE_SIZE / PRINT_MAP_HEIGHT) * 100
+      });
+    }
+  }
+
+  return tiles;
+}
+
 function buildPrintMapPoints(result: AnalysisResult) {
+  const { zoom, topLeftX, topLeftY } = buildPrintMapContext(result);
   const raw = [
     { id: 'company', lat: result.unidadeGeo.lat, lng: result.unidadeGeo.lng, color: '#1d4ed8', size: 18, label: 'Empresa' },
     ...result.points.slice(0, 80).map((point, index) => ({ id: `cep-${index}`, lat: point.lat, lng: point.lng, color: '#0284c7', size: 9, label: 'CEP' })),
     ...result.strategicPlaces.slice(0, 120).map((place, index) => ({ id: `place-${index}`, lat: place.lat, lng: place.lng, color: mapCategoryColor(place.categoriaEstrategica), size: 10, label: place.categoriaEstrategica }))
   ].filter((point) => isValidCoord(point.lat, point.lng));
 
-  if (!raw.length) return [];
-  const lats = raw.map((point) => point.lat as number);
-  const lngs = raw.map((point) => point.lng as number);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latSpan = Math.max(0.0001, maxLat - minLat);
-  const lngSpan = Math.max(0.0001, maxLng - minLng);
-
-  return raw.map((point) => ({
-    ...point,
-    x: 6 + (((point.lng as number) - minLng) / lngSpan) * 88,
-    y: 94 - (((point.lat as number) - minLat) / latSpan) * 88
-  }));
+  return raw.map((point) => {
+    const pixel = latLngToWorldPixel(point.lat as number, point.lng as number, zoom);
+    return {
+      ...point,
+      x: ((pixel.x - topLeftX) / PRINT_MAP_WIDTH) * 100,
+      y: ((pixel.y - topLeftY) / PRINT_MAP_HEIGHT) * 100
+    };
+  }).filter((point) => point.x >= -4 && point.x <= 104 && point.y >= -4 && point.y <= 104);
 }
 
 function PrintMetric({ label, value }: { label: string; value: string | number }) {
@@ -89,10 +144,20 @@ function PrintPage({ children, className = '' }: { children: ReactNode; classNam
 }
 
 function PrintGeoMap({ result }: { result: AnalysisResult }) {
+  const tiles = buildPrintMapTiles(result);
   const points = buildPrintMapPoints(result);
   return (
-    <PrintBlock title="Mapa esquemático da região analisada">
+    <PrintBlock title="Mapa da região analisada">
       <div className="print-map">
+        {tiles.map((tile) => (
+          <img
+            key={tile.key}
+            src={tile.url}
+            alt=""
+            className="print-map-tile"
+            style={{ left: `${tile.left}%`, top: `${tile.top}%`, width: `${tile.width}%`, height: `${tile.height}%` }}
+          />
+        ))}
         {points.map((point) => (
           <span
             key={point.id}
@@ -109,7 +174,7 @@ function PrintGeoMap({ result }: { result: AnalysisResult }) {
         <span><i style={{ backgroundColor: '#f97316' }} /> Barreiras</span>
         <span><i style={{ backgroundColor: '#16a34a' }} /> Parcerias</span>
       </div>
-      <p className="print-caption">Mapa proporcional gerado a partir das coordenadas da análise para impressão. O mapa interativo com ruas e camadas completas fica disponível na tela.</p>
+      <p className="print-caption">Mapa OpenStreetMap usado apenas na impressão, com marcadores calculados a partir das coordenadas da análise. O mapa interativo completo fica disponível na tela.</p>
     </PrintBlock>
   );
 }

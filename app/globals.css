@@ -246,12 +246,7 @@ body {
   }
 
   .print-map {
-    background:
-      linear-gradient(90deg, rgba(71, 85, 105, 0.18) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(71, 85, 105, 0.18) 1px, transparent 1px),
-      linear-gradient(135deg, rgba(219, 234, 254, 0.55), rgba(240, 253, 244, 0.42) 48%, rgba(255, 247, 237, 0.52)),
-      #ffffff;
-    background-size: 18mm 18mm, 18mm 18mm, auto, auto;
+    background: #eef2f7;
     border: 1.4px solid #94a3b8;
     border-radius: 4mm;
     height: 98mm;
@@ -259,16 +254,10 @@ body {
     position: relative;
   }
 
-  .print-map::before {
-    background: rgba(37, 99, 235, 0.08);
-    content: "";
-    height: 100%;
-    left: -10%;
+  .print-map-tile {
+    display: block;
     position: absolute;
-    right: -10%;
-    top: 0;
-    transform: rotate(-8deg) scale(1.15);
-    transform-origin: center;
+    z-index: 1;
   }
 
   .print-map-point {
@@ -278,7 +267,7 @@ body {
     display: block;
     position: absolute;
     transform: translate(-50%, -50%);
-    z-index: 2;
+    z-index: 3;
   }
 
   .print-map-company {
