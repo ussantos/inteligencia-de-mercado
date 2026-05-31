@@ -1,5 +1,7 @@
 # Inteligencia de Mercado
 
+[For English click here](#english-version)
+
 Aplicacao web independente para analise regional de concorrencia, oportunidades, barreiras comerciais e posicionamento para qualquer tipo de empresa.
 
 A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um repositorio GitHub privado ou publico configurado no ambiente de deploy.
@@ -541,3 +543,549 @@ Os indicadores economicos iniciais sao estimativas operacionais para apoio a dec
 Este projeto usa **Prisma 6.19.3** fixado em `package.json` e `package-lock.json`.
 
 Nao atualize para Prisma 7 sem adaptar o projeto para o novo formato com `prisma.config.ts`. No Prisma 7, `url = env("DATABASE_URL")` dentro de `schema.prisma` deixa de ser aceito.
+
+---
+
+## English Version
+
+# Market Intelligence
+
+Independent web application for regional competitor analysis, opportunity mapping, commercial barrier detection, and positioning strategy for any type of business.
+
+The application is prepared to run on Azure Static Web Apps, connected to a private or public GitHub repository configured in the deployment environment.
+
+You can test the application at: https://gray-glacier-0dc52610f.7.azurestaticapps.net/sign-in
+
+## Educational Purpose, Courses, and License
+
+This project is educational and demonstrates how to apply artificial intelligence, automation, web development, and data analysis concepts to a practical market intelligence tool.
+
+The tool was created as an applied project inspired by concepts presented in the [Artificial Intelligence](https://www.myrobotbarra.com.br/inteligencia-artificial.html) and [App Developer](https://www.myrobotbarra.com.br/app-developer.html) courses from My Robot Barra da Tijuca.
+
+The source code is available on GitHub at [ussantos/inteligencia-de-mercado](https://github.com/ussantos/inteligencia-de-mercado) under the [GNU GPL](https://www.gnu.org/licenses/gpl-3.0.html) license.
+
+This system is not a commercial product sold, licensed, or guaranteed by My Robot Barra da Tijuca, its owners, or its collaborators. The code is provided without any warranty of operation, continuity, security, technical suitability, legal suitability, labor compliance, tax compliance, accounting suitability, or data protection adequacy.
+
+Any use by other companies, franchises, businesses, organizations, or third parties is at their own risk. Before using, adapting, or deploying this system, each organization must validate the application with its technical, legal, accounting, labor, and data protection advisors.
+
+## LGPD and Privacy
+
+The application must be used with attention to Brazil's LGPD data protection law. The workflow was designed to temporarily process only the data needed for regional analysis. In spreadsheet uploads, only ZIP/postal codes are used; names, phone numbers, emails, CPF numbers, and other personal data should be avoided and, if present, are ignored by the application.
+
+Do not include sensitive data, complete customer lists, credentials, tokens, connection strings, or private information in uploaded files, commits, issues, or public examples.
+
+## Purpose
+
+The tool transforms public data and simple operational data into a practical market intelligence report. The analysis starts from the company's CNPJ, identifies address and CNAEs, compares the region with locations from Google Places, accepts an optional customer ZIP/postal code spreadsheet, and generates recommendations for marketing, sales, positioning, and local expansion.
+
+## Features
+
+- Company lookup by CNPJ using public sources, with PostgreSQL cache.
+- Automatic identification of address, ZIP/postal code, and CNAEs.
+- Selection of CNAEs and competitor or market alternative types.
+- Optional business activity description to refine searches when CNAE data is generic or incomplete.
+- Radius-based analysis around the business, with an 8 km default.
+- Optional CSV/XLSX upload with customer ZIP/postal codes.
+- Deletion of the temporary Azure Blob Storage file after the analysis completes successfully.
+- Downloadable CSV template for ZIP/postal codes.
+- ZIP/postal code normalization and validation.
+- Geocoding with LocationIQ and Nominatim fallback.
+- Straight-line distance and, when configured, route distance with OpenRouteService.
+- Competitor and relevant-place search through Google Places API.
+- Google Maps view with layers for the company, customer ZIP/postal codes, competitors, barriers, and relevant places.
+- Neighborhood ranking, conversion barriers, positioning, and personas.
+- Optional OpenAI enrichment for smarter recommendations, positioning, incremental evolution, and action planning.
+- Print-ready analysis layout for PDF, using A4 portrait pages, controlled page breaks, and compact sections to avoid splitting content in the middle.
+- Analysis history and shareable reports.
+- Clerk authentication protecting the main application at `/`.
+
+## Routes
+
+- `/` opens the main application.
+- `/sign-in` opens the Clerk login screen.
+- `/internal/market-intelligence` redirects to `/` for compatibility with old links.
+- `/internal/shared/[uuid]` opens shared reports in read-only mode.
+- `/api/analyze` runs the analysis.
+- `/api/cnpj` fetches CNPJ data.
+- `/api/history` lists the user's analysis history.
+- `/api/share` creates a shareable link.
+- `/api/blob/upload` uploads a temporary file to Azure Blob Storage through the server.
+- `/api/blob/sas` creates a temporary SAS for legacy upload flows.
+- `/api/blob/delete` deletes the temporary blob after the analysis.
+- `/.swa/health.html` is a technical route used by Azure Static Web Apps to validate deployment. Middleware must not block this path.
+
+## Architecture
+
+- Framework: Next.js 15 with App Router.
+- UI: React 19, Tailwind CSS, lucide-react, Recharts, and Google Maps JavaScript API.
+- Authentication: Clerk.
+- Database: PostgreSQL through Prisma 6.19.3.
+- Optional storage: Azure Blob Storage for temporary uploads.
+- Deployment: Azure Static Web Apps with GitHub Actions.
+- Azure API runtime: Node 22.
+- Next.js output: `standalone`, to reduce the dynamic package published as a managed Azure Static Web Apps Function.
+
+## Code Readability
+
+Because this repository may be public, the main files include explanatory comments in simple language. The goal is to help new readers understand the application flow without deep knowledge of Next.js, Prisma, Clerk, Azure, or Google Places.
+
+Comments explain the purpose of pages, components, APIs, services, types, and configuration. They must not include tokens, private URLs, connection strings, customer data, or internal production details.
+
+## Azure Static Web App
+
+Target environment:
+
+```text
+Hosting: Azure Static Web Apps
+SKU: Free or higher
+Provider: GitHub Actions
+Branch: main
+API runtime: Node 22
+```
+
+Workflow configuration:
+
+```yaml
+app_location: /
+api_location: ""
+output_location: ""
+app_build_command: "npm run build"
+```
+
+The build runs:
+
+```bash
+prisma generate && next build && node scripts/prepare-standalone.js
+```
+
+`staticwebapp.config.json` defines security headers, noindex, 401 redirect to `/sign-in`, and `node:22` runtime. `next.config.js` uses `output: 'standalone'`, and `scripts/prepare-standalone.js` copies static files and the Prisma client needed inside the package generated by Next.js.
+
+There should be only one active deployment workflow:
+
+```text
+.github/workflows/azure-static-web-apps.yml
+```
+
+Do not create another automatic workflow for the same Static Web App, because two workflows triggered by the same `push` may publish different artifacts and make deployment failures harder to diagnose.
+
+## Environment Variables
+
+See `.env.example`. Never commit `.env`, `.env.local`, tokens, connection strings, or database URLs with passwords.
+
+Required for the main application:
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `DATABASE_URL`
+- `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`
+
+Required to display Google Maps in the browser:
+
+- `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+
+Recommended to avoid authentication redirect loops in production:
+
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+
+Recommended:
+
+- `AZURE_STORAGE_CONNECTION_STRING`
+- `AZURE_STORAGE_CONTAINER_NAME`
+- `LOCATIONIQ_API_KEY`
+- `ORS_API_KEY`
+- `GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS`
+- `ANALYSIS_RATE_LIMIT_PER_HOUR`
+- `SHARED_LINK_TTL_DAYS`
+- `MONTHLY_BUDGET_ENABLED`
+- `MONTHLY_BUDGET_PERCENT`
+
+Optional:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `GOOGLE_PLACES_MONTHLY_FREE_QUOTA` or `GOOGLE_PLACES_MONTHLY_BUDGET`
+- `LOCATIONIQ_MONTHLY_FREE_QUOTA` or `LOCATIONIQ_MONTHLY_BUDGET`
+- `ORS_MONTHLY_FREE_QUOTA` or `ORS_MONTHLY_BUDGET`
+- `OPENAI_MONTHLY_FREE_QUOTA` or `OPENAI_MONTHLY_BUDGET`
+- `CNPJ_PUBLIC_MONTHLY_BUDGET`
+- `VIACEP_MONTHLY_BUDGET`
+- `NOMINATIM_MONTHLY_BUDGET`
+- `OVERPASS_MONTHLY_BUDGET`
+
+When `OPENAI_API_KEY` is configured, the application sends a summary of the analysis to AI and improves the **Smart Recommendations** and **Action Plan — Next Steps** sections with more specific guidance by neighborhood, competitors, CNAEs, analysis radius, and limitations found. Without this key, the report continues to work with local rules.
+
+Note about `AZURE_STORAGE_CONTAINER_NAME`: this value must be the container name, for example `uploads-temp`, not the storage account name.
+
+## APIs, External Services, and Required Reading
+
+To implement or adapt this system in another environment, read the documentation for each service and configure separate keys with scoped permissions. The most important rule is: public browser keys only for resources that must appear in the browser; server-side keys only in Azure/GitHub Secrets.
+
+### Azure Static Web Apps
+
+Used for hosting, environment variables, GitHub Actions, and managed runtime for dynamic Next.js routes.
+
+Read:
+
+- [Azure Static Web Apps application settings](https://learn.microsoft.com/en-us/azure/static-web-apps/application-settings)
+- [Azure Static Web Apps build configuration](https://learn.microsoft.com/en-us/azure/static-web-apps/build-configuration)
+
+Configure:
+
+- `AZURE_STATIC_WEB_APPS_API_TOKEN` as a GitHub Actions secret.
+- Production variables in Azure Static Web Apps **Environment variables**.
+- Only one active workflow to avoid concurrent deployments.
+
+### Azure Blob Storage
+
+Used for temporary CSV/XLSX uploads and file deletion after the analysis completes.
+
+Read:
+
+- [Upload blobs with JavaScript/TypeScript](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-upload-javascript)
+- Azure Storage lifecycle management documentation, if you want a second cleanup layer for old blobs.
+
+Configure:
+
+- `AZURE_STORAGE_CONNECTION_STRING`
+- `AZURE_STORAGE_CONTAINER_NAME`
+- A lifecycle rule on the temporary container, recommended even though the application deletes files after successful analysis.
+
+### Clerk
+
+Used for authentication, `/sign-in`, route protection, and user sessions.
+
+Read:
+
+- [Clerk API keys](https://clerk.com/docs/upgrade-guides/api-keys)
+- [Custom sign-in/sign-up page for Clerk and Next.js](https://clerk.com/docs/nextjs/guides/development/custom-sign-in-or-up-page)
+
+Configure:
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+
+### PostgreSQL and Prisma
+
+Used for CNPJ cache, Places cache, history, sharing, and monthly quota control.
+
+Read:
+
+- [Prisma data sources](https://www.prisma.io/docs/orm/v6/prisma-schema/overview/data-sources)
+- [Prisma connection URLs](https://www.prisma.io/docs/orm/reference/connection-urls)
+
+Configure:
+
+- `DATABASE_URL`
+- `prisma generate` during build.
+- `binaryTargets` in `schema.prisma` for the Linux/OpenSSL environment used by Azure.
+
+### Google Maps JavaScript API
+
+Used for the visual report map, layers, and markers for the company, ZIP/postal codes, competitors, and relevant places.
+
+Read:
+
+- [Maps JavaScript API troubleshooting](https://developers.google.com/maps/documentation/javascript/troubleshooting)
+- [Maps JavaScript API policies and attribution](https://developers.google.com/maps/documentation/javascript/policies)
+
+Configure:
+
+- `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
+- Enable **Maps JavaScript API** in Google Cloud.
+- Restrict this key by **HTTP referrer**, allowing the Azure Static Web Apps domain and the final production domain.
+- Do not use this public key on the backend.
+
+### Google Places API (New)
+
+Used for competitor search, relevant places, ratings, rating count, addresses, and place types.
+
+Read:
+
+- [Text Search (New)](https://developers.google.com/maps/documentation/places/web-service/reference/rest/v1/places/searchText), because the system calls `places:searchText`.
+- [Places API (New) overview](https://developers.google.com/maps/documentation/places/web-service/op-overview)
+
+Configure:
+
+- `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`
+- Enable **Places API** in Google Cloud.
+- Allow **Places API** in the key's API restrictions.
+- Use a key separate from the browser key.
+- Do not apply HTTP referrer restrictions to this server-side key; if you want restrictions, use mechanisms appropriate for server calls.
+- Check billing, quotas, and Google Cloud logs.
+
+### LocationIQ
+
+Used for geocoding addresses and ZIP/postal codes when configured.
+
+Read:
+
+- [LocationIQ documentation](https://docs.locationiq.com/docs/choose-the-right-api)
+- [LocationIQ API reference](https://api-reference.locationiq.com/)
+
+Configure:
+
+- `LOCATIONIQ_API_KEY`
+- `LOCATIONIQ_MONTHLY_FREE_QUOTA` or `LOCATIONIQ_MONTHLY_BUDGET`, if you want usage limits.
+
+### OpenRouteService
+
+Used for driving distance and estimated time when configured; otherwise, the application uses straight-line distance.
+
+Read:
+
+- [OpenRouteService Matrix Endpoint](https://giscience.github.io/openrouteservice/v8.2.0/api-reference/endpoints/matrix/)
+
+Configure:
+
+- `ORS_API_KEY`
+- `ORS_MONTHLY_FREE_QUOTA` or `ORS_MONTHLY_BUDGET`, if you want usage limits.
+
+### OpenAI API
+
+Used for optional enrichment of recommendations, positioning, personas, and the action plan.
+
+Read:
+
+- [OpenAI API pricing](https://platform.openai.com/docs/pricing)
+- [OpenAI API rate limits](https://help.openai.com/en/articles/5955598)
+
+Configure:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `OPENAI_MONTHLY_BUDGET`, remembering that the internal guard counts calls, not exact token cost.
+
+### Public CNPJ and ZIP/Postal Code Sources
+
+Used for company registration data, address, CNAEs, and ZIP/postal code normalization.
+
+Read:
+
+- [ReceitaWS Developers](https://developers.receitaws.com.br/)
+- [OpenCNPJ](https://opencnpj.com/)
+- [ViaCEP](https://viacep.com.br/)
+- [BrasilAPI CNPJ](https://brasilapi.com.br/docs#tag/CNPJ)
+
+Configure:
+
+- ViaCEP does not require a key.
+- Use database cache to reduce repeated calls.
+- Configure conservative limits with `CNPJ_PUBLIC_MONTHLY_BUDGET` and `VIACEP_MONTHLY_BUDGET`, if needed.
+
+### Nominatim and Overpass
+
+Used as legacy fallback for geocoding and OpenStreetMap-based places. The main report map now uses Google Maps.
+
+Read:
+
+- [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
+- [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API)
+
+Configure:
+
+- Use as fallback, not as a high-volume source.
+- Configure `NOMINATIM_MONTHLY_BUDGET` and `OVERPASS_MONTHLY_BUDGET`, if you want additional guards.
+
+## Quota and Cost Controls
+
+The application includes two types of limits:
+
+- `ANALYSIS_RATE_LIMIT_PER_HOUR` limits how many analyses each user can start per hour.
+- `*_MONTHLY_FREE_QUOTA`, `*_MONTHLY_BUDGET`, `MONTHLY_BUDGET_PERCENT`, and `MONTHLY_BUDGET_ENABLED` limit global monthly calls to external APIs.
+
+To stay around 60% of a provider's free tier, check the current limit in the provider dashboard and configure the real values for your project:
+
+```env
+MONTHLY_BUDGET_ENABLED=true
+MONTHLY_BUDGET_PERCENT=60
+GOOGLE_PLACES_MONTHLY_FREE_QUOTA=<monthly_google_places_limit>
+LOCATIONIQ_MONTHLY_FREE_QUOTA=<monthly_locationiq_limit>
+ORS_MONTHLY_FREE_QUOTA=<monthly_openrouteservice_limit>
+OPENAI_MONTHLY_BUDGET=<monthly_openai_call_limit>
+```
+
+You can also provide the already calculated direct budget:
+
+```env
+GOOGLE_PLACES_MONTHLY_BUDGET=<60_percent_google_places_limit>
+LOCATIONIQ_MONTHLY_BUDGET=<60_percent_locationiq_limit>
+ORS_MONTHLY_BUDGET=<60_percent_openrouteservice_limit>
+```
+
+The monthly counter is stored in the `UserRateLimit` table using a technical system key, without creating a new table. When the configured limit is reached, the external call is blocked and the analysis uses fallback behavior when available, such as cache, straight-line distance, Nominatim, or local recommendations.
+
+For public sources without keys, such as CNPJ, ViaCEP, Nominatim, and Overpass, there is no single universal monthly free-tier variable. If you want to be conservative, configure direct limits such as `CNPJ_PUBLIC_MONTHLY_BUDGET`, `VIACEP_MONTHLY_BUDGET`, `NOMINATIM_MONTHLY_BUDGET`, and `OVERPASS_MONTHLY_BUDGET`.
+
+Important: free limits change over time and vary by account, project, API, SKU, and billing configuration. The application does not hardcode these numbers as absolute truth. Configure values according to the current Google Cloud, LocationIQ, OpenRouteService, and OpenAI dashboards. For OpenAI, the application guard counts calls, not tokens or exact financial cost; also use the provider's billing controls.
+
+## Temporary Uploads in Azure Blob
+
+The CSV/XLSX file with ZIP/postal codes is read in the browser, and only ZIP/postal codes are sent to the analysis. When Azure Blob Storage is configured, the application also uploads the file to a temporary container through `/api/blob/upload`.
+
+The upload goes through the server to avoid browser CORS issues. The old `/api/blob/sas` route still exists for compatibility, but the main screen no longer depends on direct browser upload to Blob Storage.
+
+After the analysis completes successfully, `/api/blob/delete` deletes the temporary blob by the name generated by the application. As an extra operational safety layer, it is also recommended to configure a lifecycle rule in Azure Storage to delete old blobs from the temporary container if a session is interrupted before application cleanup.
+
+## Google Places
+
+Competitor search uses the new Places API:
+
+```text
+https://places.googleapis.com/v1/places:searchText
+```
+
+The key must be server-side in `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`. The public `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` is only for browser maps and must not be used by the backend to search competitors. The API must be enabled in Google Cloud and billing must be active.
+
+If diagnostics show `API_KEY_HTTP_REFERRER_BLOCKED`, the backend key is restricted by site/referrer. Create a separate server key, allow **Places API** in API restrictions, and do not apply HTTP referrer restrictions to that key. Then register it in Azure Static Web Apps and GitHub Secrets as `GOOGLE_MAPS_SERVER_API_KEY`, or replace `GOOGLE_PLACES_API_KEY`.
+
+The application does not cache empty results when the Google key is missing. After the key is configured, the next analysis calls Google Places directly.
+
+If competitors do not appear, verify:
+
+- Places API is enabled in Google Cloud.
+- Billing is active.
+- Key restrictions allow Places API.
+- Server key has no HTTP referrer restriction for `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`.
+- Usage quotas.
+- Old cache in `PlacesCache`.
+- `GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS` is not too low.
+- Old empty results in `PlacesCache`. The application ignores new empty caches, but old records may still exist in the database.
+
+## Running Locally
+
+```powershell
+npm ci
+Copy-Item .env.example .env.local
+notepad .env.local
+npx prisma generate
+npx prisma migrate dev --name init
+npm run typecheck
+npm run build
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000/
+```
+
+## Deployment
+
+Deployment runs through GitHub Actions in:
+
+```text
+.github/workflows/azure-static-web-apps.yml
+```
+
+The workflow requires this secret:
+
+```text
+AZURE_STATIC_WEB_APPS_API_TOKEN
+```
+
+To get the SWA token, replace the placeholders with your resource name and resource group:
+
+```bash
+az staticwebapp secrets list \
+  --name <STATIC_WEB_APP_NAME> \
+  --resource-group <RESOURCE_GROUP_NAME> \
+  --query "properties.apiKey" \
+  -o tsv
+```
+
+To confirm that the SWA is connected to the correct repository:
+
+```bash
+az staticwebapp show \
+  --name <STATIC_WEB_APP_NAME> \
+  --resource-group <RESOURCE_GROUP_NAME> \
+  --query "{provider:provider, repo:repositoryUrl, branch:branch, hostname:defaultHostname}" \
+  -o json
+```
+
+Expected result:
+
+```json
+{
+  "provider": "GitHub",
+  "repo": "https://github.com/<owner>/<repo>",
+  "branch": "main",
+  "hostname": "<default-hostname>.azurestaticapps.net"
+}
+```
+
+## Troubleshooting
+
+### The URL Shows the Default Azure Page
+
+This means there has not been a valid deployment to the SWA yet. Check:
+
+- The SWA is connected to the correct repository.
+- The GitHub Actions workflow completed successfully.
+- The `AZURE_STATIC_WEB_APPS_API_TOKEN` secret exists in the repository.
+- The workflow uses `output_location: ""`, not `build`.
+- The build finishes without errors.
+
+### The Application Redirects to Login
+
+This is expected. The main route `/` is protected by Clerk.
+
+### Prisma Error During Build
+
+Confirm that the build runs `prisma generate && next build && node scripts/prepare-standalone.js` and that `DATABASE_URL` is configured in GitHub Actions/Azure.
+
+### Prisma OpenSSL Error in Production
+
+If the message says Prisma was generated for `debian-openssl-1.1.x`, but Azure requires `debian-openssl-3.0.x`, confirm:
+
+- `prisma/schema.prisma` has `binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]`.
+- Deployment ran after this change.
+- `scripts/prepare-standalone.js` copied `node_modules/.prisma` and `node_modules/@prisma/client` into `.next/standalone/node_modules`.
+
+### Azure Functions Publishing Failure
+
+In hybrid Next.js apps, Azure Static Web Apps packages the dynamic part as a managed Function. If publishing fails in that step, check:
+
+- `next.config.js` contains `output: 'standalone'`.
+- The build runs `scripts/prepare-standalone.js` after `next build`.
+- Middleware does not block `/.swa/health.html`.
+- There is only one active deployment workflow in `.github/workflows`.
+
+### Temporary Upload Fails
+
+Confirm:
+
+- `AZURE_STORAGE_CONNECTION_STRING`
+- `AZURE_STORAGE_CONTAINER_NAME`
+
+If these variables are not configured, the analysis can still continue with ZIP/postal codes processed locally.
+
+## Security
+
+- Do not paste tokens into commands with `--debug`, because logs may expose sensitive arguments.
+- If a GitHub PAT is exposed, revoke it immediately and generate a new one.
+- Secrets must stay in Azure Static Web Apps or GitHub Actions, never in the repository.
+- `.env`, `.env.local`, `node_modules`, and `.next` must not be versioned.
+
+## Methodological Limitations
+
+- Google Places depends on key configuration, active billing, quotas, enabled APIs, and local data availability.
+- ViaCEP does not provide income data.
+- IBGE Localidades identifies city/state, but not neighborhood-level income.
+- SIDRA requires table, variable, period, classification, and territorial level.
+- PNAD is sample-based and usually does not provide neighborhood/ZIP-level granularity.
+- 2022 Census data may enrich the analysis, but requires ETL with census tract data, territorial meshes, and geographic joins.
+
+The initial economic indicators are operational estimates for decision support, not precise census statistics by ZIP/postal code.
+
+## Prisma
+
+This project uses **Prisma 6.19.3** pinned in `package.json` and `package-lock.json`.
+
+Do not upgrade to Prisma 7 without adapting the project to the new `prisma.config.ts` format. In Prisma 7, `url = env("DATABASE_URL")` inside `schema.prisma` is no longer accepted.
