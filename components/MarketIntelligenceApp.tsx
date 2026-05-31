@@ -155,7 +155,8 @@ export function MarketIntelligenceApp() {
   const allCnaes = useMemo(() => unidade?.cnaes?.length ? unidade.cnaes : unidade ? [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }] : [], [unidade]);
   const competitorOptions = useMemo(() => inferCompetitorOptions(selectedCnaes.length ? selectedCnaes : allCnaes), [allCnaes, selectedCnaes]);
   const safeAnalysisRadiusKm = clampAnalysisRadius(analysisRadiusKm);
-  const canAnalyze = Boolean(unidade && selectedCnaes.length > 0 && competitorTypes.length > 0 && !loadingAnalysis);
+  const hasMarketScope = selectedCnaes.length > 0 || businessActivityDescription.trim().length > 0;
+  const canAnalyze = Boolean(unidade && hasMarketScope && competitorTypes.length > 0 && !loadingAnalysis);
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
 
   useEffect(() => {
@@ -497,7 +498,7 @@ export function MarketIntelligenceApp() {
                 </div>
                 <Button className="min-w-56" onClick={startAnalysis} disabled={!canAnalyze}>{loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />} Iniciar análise</Button>
               </div>
-              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, primeiro carregue os dados da empresa com um CNPJ válido, selecione pelo menos um CNAE e um tipo de concorrente.</p>}
+              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, carregue os dados da empresa, selecione pelo menos um CNAE ou descreva o ramo de atividade, e mantenha pelo menos um tipo de concorrente selecionado.</p>}
             </Card>
           </section>
         ) : (
