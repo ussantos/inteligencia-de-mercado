@@ -34,9 +34,9 @@ function mapCategoryColor(category: string) {
 
 function buildPrintMapPoints(result: AnalysisResult) {
   const raw = [
-    { id: 'company', lat: result.unidadeGeo.lat, lng: result.unidadeGeo.lng, color: '#2563eb', size: 14, label: 'Empresa' },
-    ...result.points.slice(0, 80).map((point, index) => ({ id: `cep-${index}`, lat: point.lat, lng: point.lng, color: '#38bdf8', size: 7, label: 'CEP' })),
-    ...result.strategicPlaces.slice(0, 120).map((place, index) => ({ id: `place-${index}`, lat: place.lat, lng: place.lng, color: mapCategoryColor(place.categoriaEstrategica), size: 8, label: place.categoriaEstrategica }))
+    { id: 'company', lat: result.unidadeGeo.lat, lng: result.unidadeGeo.lng, color: '#1d4ed8', size: 18, label: 'Empresa' },
+    ...result.points.slice(0, 80).map((point, index) => ({ id: `cep-${index}`, lat: point.lat, lng: point.lng, color: '#0284c7', size: 9, label: 'CEP' })),
+    ...result.strategicPlaces.slice(0, 120).map((place, index) => ({ id: `place-${index}`, lat: place.lat, lng: place.lng, color: mapCategoryColor(place.categoriaEstrategica), size: 10, label: place.categoriaEstrategica }))
   ].filter((point) => isValidCoord(point.lat, point.lng));
 
   if (!raw.length) return [];
