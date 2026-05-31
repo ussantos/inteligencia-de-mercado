@@ -34,8 +34,8 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 
 - Consulta de empresa por CNPJ usando fontes publicas, com cache em Postgres.
 - Identificacao automatica de endereco, CEP e CNAEs.
-- Selecao de CNAEs e tipos de concorrentes/alternativas de mercado.
-- Descricao opcional do ramo de atividade para refinar a busca quando o CNAE for generico ou incompleto.
+- Selecao de CNAEs e tipos de concorrentes/alternativas de mercado; a busca de concorrentes deve respeitar essas escolhas.
+- Descricao opcional do ramo de atividade para refinar a busca quando o CNAE for generico ou incompleto; quando preenchida, ela entra no escopo da analise e nas consultas ao Google Places.
 - Analise por raio em torno do empreendimento, com padrao de 8 km.
 - Upload opcional de CSV/XLSX com CEPs de clientes.
 - Exclusao do arquivo temporario do Azure Blob Storage depois que a analise termina com sucesso.
@@ -47,7 +47,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras e locais relevantes.
 - Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, evolucao incremental e plano de acao.
-- Impressao da analise com layout especifico para PDF, em folha A4 retrato, com quebras de pagina controladas e secoes compactas para evitar cortes no meio do conteudo.
+- Impressao da analise com layout especifico para PDF, em folha A4 retrato, com mapa esquematico, graficos, quebras de pagina controladas e secoes compactas para evitar cortes no meio do conteudo.
 - Historico e compartilhamento de analises.
 - Autenticacao Clerk protegendo a aplicacao principal na raiz `/`.
 
@@ -395,6 +395,8 @@ https://places.googleapis.com/v1/places:searchText
 
 A chave deve ser server-side em `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`. A chave publica `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` serve para mapas no navegador e nao deve ser usada pelo backend para buscar concorrentes. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
 
+As consultas ao Google Places sao montadas a partir do escopo escolhido pelo usuario: CNAEs selecionados, descricao opcional do ramo de atividade e tipos de concorrentes. O CNAE principal cadastral do CNPJ e usado como fallback apenas quando o usuario nao escolhe CNAE nem descreve o ramo manualmente.
+
 Se o diagnostico mostrar `API_KEY_HTTP_REFERRER_BLOCKED`, a chave usada no backend esta restrita por site/referrer. Crie uma chave separada para o servidor, permita a **Places API** nas restricoes de API e nao aplique restricao de HTTP referrer nessa chave. Depois cadastre essa chave no Azure Static Web Apps e nos secrets do GitHub como `GOOGLE_MAPS_SERVER_API_KEY` ou substitua `GOOGLE_PLACES_API_KEY`.
 
 A aplicacao nao grava cache vazio quando a chave Google esta ausente. Assim, depois que a chave e configurada, a proxima analise chama o Google Places de verdade.
@@ -582,8 +584,8 @@ The tool transforms public data and simple operational data into a practical mar
 
 - Company lookup by CNPJ using public sources, with PostgreSQL cache.
 - Automatic identification of address, ZIP/postal code, and CNAEs.
-- Selection of CNAEs and competitor or market alternative types.
-- Optional business activity description to refine searches when CNAE data is generic or incomplete.
+- Selection of CNAEs and competitor or market alternative types; competitor searches should respect these user choices.
+- Optional business activity description to refine searches when CNAE data is generic or incomplete; when filled in, it becomes part of the analysis scope and Google Places queries.
 - Radius-based analysis around the business, with an 8 km default.
 - Optional CSV/XLSX upload with customer ZIP/postal codes.
 - Deletion of the temporary Azure Blob Storage file after the analysis completes successfully.
@@ -595,7 +597,7 @@ The tool transforms public data and simple operational data into a practical mar
 - Google Maps view with layers for the company, customer ZIP/postal codes, competitors, barriers, and relevant places.
 - Neighborhood ranking, conversion barriers, positioning, and personas.
 - Optional OpenAI enrichment for smarter recommendations, positioning, incremental evolution, and action planning.
-- Print-ready analysis layout for PDF, using A4 portrait pages, controlled page breaks, and compact sections to avoid splitting content in the middle.
+- Print-ready analysis layout for PDF, using A4 portrait pages, schematic map, charts, controlled page breaks, and compact sections to avoid splitting content in the middle.
 - Analysis history and shareable reports.
 - Clerk authentication protecting the main application at `/`.
 
@@ -940,6 +942,8 @@ https://places.googleapis.com/v1/places:searchText
 ```
 
 The key must be server-side in `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`. The public `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` is only for browser maps and must not be used by the backend to search competitors. The API must be enabled in Google Cloud and billing must be active.
+
+Google Places queries are built from the scope selected by the user: selected CNAEs, optional business activity description, and competitor types. The company's main registered CNAE is used as a fallback only when the user does not select any CNAE and does not manually describe the activity.
 
 If diagnostics show `API_KEY_HTTP_REFERRER_BLOCKED`, the backend key is restricted by site/referrer. Create a separate server key, allow **Places API** in API restrictions, and do not apply HTTP referrer restrictions to that key. Then register it in Azure Static Web Apps and GitHub Secrets as `GOOGLE_MAPS_SERVER_API_KEY`, or replace `GOOGLE_PLACES_API_KEY`.
 

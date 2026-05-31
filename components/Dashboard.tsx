@@ -65,6 +65,10 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
   const direct = result.strategicPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
   const indirect = result.strategicPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
   const position = result.posicionamentoUnidade;
+  const analysisScope = [
+    result.selectedCnaes.length ? result.selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : '',
+    result.businessActivityDescription ? `Descrição: ${result.businessActivityDescription}` : ''
+  ].filter(Boolean).join(' · ') || 'Escopo não informado';
   const smartRecommendations = result.recomendacoesInteligentes || {
     prioridadePrincipal: 'Priorize os bairros com maior afinidade e valide a resposta comercial antes de ampliar investimento.',
     brechaCompetitiva: 'Use conveniência, clareza de oferta e prova social local para se diferenciar de alternativas próximas.',
@@ -99,7 +103,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
               <strong>Raio analisado:</strong> {result.analysisRadiusKm} km
             </p>
             <p className="mt-2 text-sm text-slate-500">
-              <strong>CNAEs analisados:</strong> {result.selectedCnaes.map((cnae) => cnae.descricao).join(' · ')}
+              <strong>Escopo analisado:</strong> {analysisScope}
             </p>
             <p className="mt-2 text-sm text-slate-500">
               <strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}

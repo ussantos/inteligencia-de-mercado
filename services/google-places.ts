@@ -182,13 +182,16 @@ function buildSearchJobs(input: {
   businessActivityDescription?: string;
 }): Array<{ query: string; config: CompetitorTypeConfig; competitorType: CompetitorType }> {
   // Um "job" e uma busca que sera enviada ao Google.
-  // Criamos varias buscas combinando tipo de concorrente, CNAE e cidade.
+  // Criamos buscas combinando tipo de concorrente, escopo escolhido pelo usuario e cidade.
+  // Nao fazemos buscas genericas soltas, como "negocios similares RJ", porque isso costuma trazer locais fora da expectativa.
   const configs = getConfigsForCompetitorTypes(input.competitorTypes);
   const municipioUf = `${input.unidade.municipio} ${input.unidade.uf}`.trim();
+  const description = String(input.businessActivityDescription || '').trim();
+  const selectedTerms = input.selectedCnaes.map((cnae) => cnae.descricao).map((term) => String(term || '').trim()).filter(Boolean);
   const businessTerms = [
-    input.businessActivityDescription,
-    input.unidade.cnaePrincipalDescricao,
-    ...input.selectedCnaes.map((cnae) => cnae.descricao)
+    description,
+    ...selectedTerms,
+    ...(description || selectedTerms.length ? [] : [input.unidade.cnaePrincipalDescricao])
   ].map((term) => String(term || '').trim()).filter(Boolean).slice(0, 6);
   const cnaeTerms = input.selectedCnaes
     .map((cnae) => cnae.descricao)
@@ -199,8 +202,7 @@ function buildSearchJobs(input: {
   for (const config of configs) {
     const queries = config.googleQueries.slice(0, 2);
     for (const query of queries) {
-      jobs.push({ query: `${query} ${municipioUf}`.trim(), config, competitorType: config.type });
-      for (const term of businessTerms.slice(0, 2)) {
+      for (const term of businessTerms.slice(0, 3)) {
         jobs.push({ query: `${query} ${term} ${municipioUf}`.trim(), config, competitorType: config.type });
       }
     }
@@ -233,12 +235,17 @@ export async function getStrategicPlaces(input: {
   // Esta funcao coordena a busca de locais.
   // Primeiro tenta cache; se nao tiver cache e houver chave Google, chama a API e salva o resultado.
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
-  const selectedCnaes = input.selectedCnaes?.length ? input.selectedCnaes : input.unidade.cnaes;
+  const activityDescription = String(input.businessActivityDescription || '').trim();
+  const selectedCnaes = input.selectedCnaes?.length
+    ? input.selectedCnaes
+    : activityDescription
+      ? []
+      : input.unidade.cnaes.slice(0, 1);
   const radiusM = Math.max(1000, Math.min(50000, Math.round((input.radiusKm || 8) * 1000)));
-  const activityKey = normalizeText(input.businessActivityDescription || '').slice(0, 120);
+  const activityKey = normalizeText(activityDescription).slice(0, 120);
   const cnaeKey = selectedCnaes.map((cnae) => `${cnae.codigo}-${cnae.descricao}`).sort().join('|');
   const typeKey = [...competitorTypes].sort().join('|');
-  const cacheKey = `google:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}:${activityKey}`;
+  const cacheKey = `google:v2:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}:${activityKey}`;
   const cached = await prisma.placesCache.findFirst({ where: { cacheKey, expiresAt: { gt: new Date() } } });
   if (cached) {
     const cachedPlaces = cached.resultsJson as unknown as StrategicPlace[];
@@ -253,11 +260,15 @@ export async function getStrategicPlaces(input: {
   }
 
   const maxSearches = Number(process.env.GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS || 24);
-  const jobs = buildSearchJobs({ unidade: input.unidade, competitorTypes, selectedCnaes, businessActivityDescription: input.businessActivityDescription }).slice(0, Math.max(1, maxSearches));
+  const jobs = buildSearchJobs({ unidade: input.unidade, competitorTypes, selectedCnaes, businessActivityDescription: activityDescription }).slice(0, Math.max(1, maxSearches));
   const ownNames = [input.unidade.razaoSocial, input.unidade.nomeFantasia].filter(Boolean).map((value) => normalizeText(String(value)));
   const seen = new Set<string>();
   const places: StrategicPlace[] = [];
-  const diagnostics: string[] = [`Google Places: usando ${source}, raio ${Math.round(radiusM / 1000)} km, ${jobs.length} busca(s).`];
+  const scopeForDiagnostics = [
+    activityDescription,
+    ...selectedCnaes.map((cnae) => cnae.descricao)
+  ].filter(Boolean).join(' | ');
+  const diagnostics: string[] = [`Google Places: usando ${source}, raio ${Math.round(radiusM / 1000)} km, ${jobs.length} busca(s), escopo: ${scopeForDiagnostics || input.unidade.cnaePrincipalDescricao}.`];
 
   for (const job of jobs) {
     const search = await googleTextSearch({ query: job.query, lat: input.center.lat, lng: input.center.lng, radiusM });
@@ -320,7 +331,7 @@ export async function getStrategicPlaces(input: {
     create: {
       cacheKey,
       cep: input.center.cep,
-      domain: selectedCnaes.map((cnae) => cnae.descricao).join(', '),
+      domain: scopeForDiagnostics || input.unidade.cnaePrincipalDescricao,
       searchType: `google-places:${typeKey}`,
       resultsJson: sorted as any,
       expiresAt: new Date(Date.now() + TTL_30_DAYS)

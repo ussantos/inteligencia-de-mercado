@@ -6,6 +6,8 @@ import type { AnalysisResult } from '@/lib/types';
 import type { ReactNode } from 'react';
 import { formatKm } from '@/lib/utils';
 
+const PRINT_CHART_COLORS = ['#2563eb', '#16a34a', '#f97316', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#be185d'];
+
 function starLabel(rating?: number | null, count?: number | null) {
   if (!rating) return 'Sem avaliacao Google';
   return `${rating.toFixed(1)} (${count || 0} avaliacoes)`;
@@ -14,6 +16,44 @@ function starLabel(rating?: number | null, count?: number | null) {
 function valueOrDash(value: unknown) {
   const text = String(value ?? '').trim();
   return text || '-';
+}
+
+function isValidCoord(lat: unknown, lng: unknown) {
+  return typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng);
+}
+
+function mapCategoryColor(category: string) {
+  const normalized = category.toLowerCase();
+  if (normalized.includes('barreira')) return '#f97316';
+  if (normalized.includes('parceria')) return '#16a34a';
+  if (normalized.includes('polo')) return '#7c3aed';
+  if (normalized.includes('indireto')) return '#475569';
+  if (normalized.includes('direto')) return '#0f172a';
+  return '#0891b2';
+}
+
+function buildPrintMapPoints(result: AnalysisResult) {
+  const raw = [
+    { id: 'company', lat: result.unidadeGeo.lat, lng: result.unidadeGeo.lng, color: '#2563eb', size: 14, label: 'Empresa' },
+    ...result.points.slice(0, 80).map((point, index) => ({ id: `cep-${index}`, lat: point.lat, lng: point.lng, color: '#38bdf8', size: 7, label: 'CEP' })),
+    ...result.strategicPlaces.slice(0, 120).map((place, index) => ({ id: `place-${index}`, lat: place.lat, lng: place.lng, color: mapCategoryColor(place.categoriaEstrategica), size: 8, label: place.categoriaEstrategica }))
+  ].filter((point) => isValidCoord(point.lat, point.lng));
+
+  if (!raw.length) return [];
+  const lats = raw.map((point) => point.lat as number);
+  const lngs = raw.map((point) => point.lng as number);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const latSpan = Math.max(0.0001, maxLat - minLat);
+  const lngSpan = Math.max(0.0001, maxLng - minLng);
+
+  return raw.map((point) => ({
+    ...point,
+    x: 6 + (((point.lng as number) - minLng) / lngSpan) * 88,
+    y: 94 - (((point.lat as number) - minLat) / latSpan) * 88
+  }));
 }
 
 function PrintMetric({ label, value }: { label: string; value: string | number }) {
@@ -48,6 +88,61 @@ function PrintPage({ children, className = '' }: { children: ReactNode; classNam
   return <article className={`print-page ${className}`}>{children}</article>;
 }
 
+function PrintGeoMap({ result }: { result: AnalysisResult }) {
+  const points = buildPrintMapPoints(result);
+  return (
+    <PrintBlock title="Mapa esquemático da região analisada">
+      <div className="print-map">
+        {points.map((point) => (
+          <span
+            key={point.id}
+            className={`print-map-point ${point.id === 'company' ? 'print-map-company' : ''}`}
+            style={{ left: `${point.x}%`, top: `${point.y}%`, backgroundColor: point.color, width: `${point.size}px`, height: `${point.size}px` }}
+            title={point.label}
+          />
+        ))}
+      </div>
+      <div className="print-map-legend">
+        <span><i style={{ backgroundColor: '#2563eb' }} /> Empresa</span>
+        <span><i style={{ backgroundColor: '#38bdf8' }} /> CEPs/clientes</span>
+        <span><i style={{ backgroundColor: '#0f172a' }} /> Concorrentes</span>
+        <span><i style={{ backgroundColor: '#f97316' }} /> Barreiras</span>
+        <span><i style={{ backgroundColor: '#16a34a' }} /> Parcerias</span>
+      </div>
+      <p className="print-caption">Mapa proporcional gerado a partir das coordenadas da análise para impressão. O mapa interativo com ruas e camadas completas fica disponível na tela.</p>
+    </PrintBlock>
+  );
+}
+
+function PrintBarChart({ title, rows }: { title: string; rows: Array<{ label: string; value: number; color?: string }> }) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  return (
+    <PrintBlock title={title}>
+      <div className="print-bars">
+        {rows.map((row, index) => (
+          <div key={row.label} className="print-bar-row">
+            <span>{row.label}</span>
+            <div>
+              <i style={{ width: `${Math.max(4, (row.value / max) * 100)}%`, backgroundColor: row.color || PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }} />
+            </div>
+            <strong>{row.value}</strong>
+          </div>
+        ))}
+      </div>
+    </PrintBlock>
+  );
+}
+
+function PrintCategoryChart({ result }: { result: AnalysisResult }) {
+  const counts = new Map<string, number>();
+  result.strategicPlaces.forEach((place) => {
+    const key = place.categoriaEstrategica || 'Outros';
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  const rows = [...counts.entries()].map(([label, value], index) => ({ label, value, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] })).slice(0, 8);
+  return <PrintBarChart title="Locais por categoria estratégica" rows={rows.length ? rows : [{ label: 'Sem locais mapeados', value: 0 }]} />;
+}
+
 export function PrintableReport({ result }: { result: AnalysisResult }) {
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
   const direct = result.strategicPlaces.filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente direto')).length;
@@ -64,6 +159,12 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
   const topPlaces = result.strategicPlaces.slice(0, 12);
   const topAffinity = result.afinidadePorBairro.slice(0, 6);
   const topEconomic = result.perfilEconomico.slice(0, 6);
+  const distanceRows = result.estatisticas.distribuicaoDistancias.map((item, index) => ({ label: item.faixa, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
+  const neighborhoodRows = result.estatisticas.topBairros.slice(0, 8).map((item, index) => ({ label: `${item.bairro}, ${item.cidade}`, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
+  const scopeLabel = [
+    result.selectedCnaes.length ? result.selectedCnaes.map((cnae) => cnae.descricao).join(' | ') : '',
+    result.businessActivityDescription ? `Descricao: ${result.businessActivityDescription}` : ''
+  ].filter(Boolean).join(' | ') || 'Escopo não informado';
 
   return (
     <div id="analysis-report" className="print-report">
@@ -102,11 +203,21 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
             <p><strong>CNAE principal:</strong> {result.unidade.cnaePrincipalCodigo} - {result.unidade.cnaePrincipalDescricao}</p>
           </PrintBlock>
           <PrintBlock title="Escopo da analise">
-            <p><strong>CNAEs usados:</strong> {result.selectedCnaes.map((cnae) => cnae.descricao).join(' | ')}</p>
+            <p><strong>Escopo usado:</strong> {scopeLabel}</p>
             {result.businessActivityDescription && <p><strong>Descricao informada:</strong> {result.businessActivityDescription}</p>}
             <p><strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}</p>
           </PrintBlock>
         </div>
+      </PrintPage>
+
+      <PrintPage>
+        <h2>Mapa e gráficos da análise</h2>
+        <PrintGeoMap result={result} />
+        <div className="print-two-columns">
+          <PrintBarChart title="CEPs por faixa de distância" rows={distanceRows.length ? distanceRows : [{ label: 'Sem planilha', value: 0 }]} />
+          <PrintBarChart title="Bairros com mais CEPs enviados" rows={neighborhoodRows.length ? neighborhoodRows : [{ label: 'Sem bairros', value: 0 }]} />
+        </div>
+        <PrintCategoryChart result={result} />
       </PrintPage>
 
       <PrintPage>
@@ -131,29 +242,12 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
         </PrintBlock>
 
         <div className="print-two-columns">
-          <PrintBlock title="CEPs por faixa de distancia">
-            <table className="print-table">
-              <tbody>
-                {result.estatisticas.distribuicaoDistancias.map((item) => (
-                  <tr key={item.faixa}>
-                    <th>{item.faixa}</th>
-                    <td>{item.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <PrintBlock title="Resumo de distância">
+            <p><strong>Distância média:</strong> {result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMediaKm) : 'Sem planilha'}</p>
+            <p><strong>Distância mediana:</strong> {result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMedianaKm) : 'Sem planilha'}</p>
           </PrintBlock>
-          <PrintBlock title="Bairros com mais CEPs enviados">
-            <table className="print-table">
-              <tbody>
-                {result.estatisticas.topBairros.slice(0, 8).map((item) => (
-                  <tr key={`${item.bairro}-${item.cidade}`}>
-                    <th>{item.bairro}, {item.cidade}</th>
-                    <td>{item.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <PrintBlock title="Índice de oportunidade">
+            <p>{result.estatisticas.indiceOportunidadeMercado}/100</p>
           </PrintBlock>
         </div>
       </PrintPage>

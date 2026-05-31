@@ -209,10 +209,10 @@ function persona(input: {
   };
 }
 
-function buildPersonas(unidade: UnidadeNegocio, topBairro: string): Persona[] {
+function buildPersonas(unidade: UnidadeNegocio, topBairro: string, analysisSegment?: string): Persona[] {
   // Personas sao personagens ficticios que representam tipos de clientes.
   // Elas ajudam marketing e atendimento a imaginar melhor para quem estao falando.
-  const segment = unidade.cnaePrincipalDescricao || 'segmento analisado';
+  const segment = analysisSegment || unidade.cnaePrincipalDescricao || 'segmento analisado';
   return [
     persona({
       nome: 'Cliente de proximidade',
@@ -300,12 +300,17 @@ export async function runMarketAnalysis(input: {
   const validCeps = [...new Set(rawCeps.map(normalizeCep).filter(isValidCep))];
   const invalidCeps = rawCeps.map(String).filter((cep) => cep.trim() && !isValidCep(cep));
   const analysisRadiusKm = Math.max(1, Math.min(50, Number(input.analysisRadiusKm || 8)));
-  const selectedCnaes = input.selectedCnaes?.length ? input.selectedCnaes : input.unidade.cnaes.slice(0, 3);
   const businessActivityDescription = String(input.businessActivityDescription || '').trim().slice(0, 300);
+  const submittedCnaes = Array.isArray(input.selectedCnaes) ? input.selectedCnaes : [];
+  const selectedCnaes = submittedCnaes.length
+    ? submittedCnaes
+    : businessActivityDescription
+      ? []
+      : input.unidade.cnaes.slice(0, 1);
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
   const domain = [
     businessActivityDescription ? `Descrição informada: ${businessActivityDescription}` : '',
-    selectedCnaes.map((cnae) => `${cnae.codigo ? `${cnae.codigo} — ` : ''}${cnae.descricao}`).join(' | ') || input.unidade.cnaePrincipalDescricao
+    selectedCnaes.map((cnae) => `${cnae.codigo ? `${cnae.codigo} — ` : ''}${cnae.descricao}`).join(' | ')
   ].filter(Boolean).join(' | ');
 
   const unitGeo = await geocodeCep(input.unidade.cep);
@@ -354,6 +359,9 @@ export async function runMarketAnalysis(input: {
   const reviewDays = fase === 'Mercado com Lacuna' ? 30 : fase === 'Mercado em Crescimento' ? 60 : fase === 'Mercado Maduro' ? 90 : 45;
   const unitName = input.unidade.nomeFantasia || input.unidade.razaoSocial;
   const topBairro = neighborhoodScores[0]?.bairro || input.unidade.bairro;
+  const analysisSegment = businessActivityDescription
+    || selectedCnaes.map((cnae) => cnae.descricao).filter(Boolean).join(', ')
+    || input.unidade.cnaePrincipalDescricao;
   const hasGoogleKey = Boolean(process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY);
 
   const result: AnalysisResult = {
@@ -388,7 +396,7 @@ export async function runMarketAnalysis(input: {
     obstaculosMatricula: buildObstacles(neighborhoodScores, strategicPlaces, analysisRadiusKm),
     posicionamentoUnidade: {
       forcasAtuais: [
-        `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com CNAE principal ${input.unidade.cnaePrincipalCodigo} — ${input.unidade.cnaePrincipalDescricao}${businessActivityDescription ? `, complementado pela descrição informada: ${businessActivityDescription}.` : '.'}`,
+        `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com escopo de análise definido por ${selectedCnaes.length ? `CNAE(s) selecionado(s): ${selectedCnaes.map((cnae) => cnae.descricao).join(', ')}` : `descrição informada pelo usuário: ${businessActivityDescription}`}.`,
         'A análise considera a região real da empresa detectada pelo CNPJ, e não um território genérico.',
         'Atendimento consultivo, prova social, clareza de oferta e conveniência local são ativos importantes para conversão.'
       ],
@@ -418,7 +426,7 @@ export async function runMarketAnalysis(input: {
         'Clientes avançam mais rápido quando recebem preço, prazo e diferenciais de forma objetiva.'
       ]
     },
-    personas: buildPersonas(input.unidade, topBairro),
+    personas: buildPersonas(input.unidade, topBairro, analysisSegment),
     evolucaoIncremental: {
       manter: ['WhatsApp ou canal direto como principal ponto de conversão.', 'Atendimento consultivo como porta de entrada.', 'Comunicação centrada no problema que o negócio resolve.'],
       melhorar: [`Segmentação por bairros dentro do raio de ${analysisRadiusKm} km.`, 'Scripts de objeção por perfil de cliente, bairro e tipo de concorrente.', 'Mensuração de leads por origem geográfica e por concorrente citado.'],

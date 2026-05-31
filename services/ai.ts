@@ -23,13 +23,16 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
   const payload = {
     empresa: {
       nome: base.unidade.nomeFantasia || base.unidade.razaoSocial,
-      cnae: `${base.unidade.cnaePrincipalCodigo} - ${base.unidade.cnaePrincipalDescricao}`,
+      cnaeCadastralPrincipal: `${base.unidade.cnaePrincipalCodigo} - ${base.unidade.cnaePrincipalDescricao}`,
       bairro: base.unidade.bairro,
       cidade: base.unidade.municipio
     },
+    escopoInformadoPeloUsuario: {
+      descricaoDoRamo: base.businessActivityDescription || null,
+      cnaesSelecionados: base.selectedCnaes,
+      tiposDeConcorrentesSelecionados: base.competitorTypes
+    },
     estatisticas: base.estatisticas,
-    competitorTypes: base.competitorTypes,
-    selectedCnaes: base.selectedCnaes,
     analysisRadiusKm: base.analysisRadiusKm,
     faseMercadoLocal: base.faseMercadoLocal,
     planoLocalInicial: base.planoDeAcao,
@@ -55,6 +58,7 @@ Gere uma complementação em PT-BR, sem substituir a operação atual da empresa
 Para o campo "planoDeAcao", aja como consultor executivo e entregue recomendações realmente acionáveis:
 - Crie de 6 a 8 ações priorizadas.
 - Use os bairros, concorrentes, avaliações, CNAEs, obstáculos e fase de mercado disponíveis.
+- Respeite o escopo informado pelo usuário: descricaoDoRamo, cnaesSelecionados e tiposDeConcorrentesSelecionados. O CNAE cadastral principal serve apenas como contexto da empresa, não como permissão para mudar o segmento da análise.
 - Cada ação deve começar com verbo de comando e dizer o que fazer, onde fazer e por que fazer.
 - Evite conselhos genéricos como "melhorar marketing" sem canal, público, teste ou métrica.
 - Inclua pelo menos uma ação de curto prazo, uma de prova social/reputação, uma de campanha local, uma de abordagem comercial e uma de mensuração.

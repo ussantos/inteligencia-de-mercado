@@ -412,9 +412,9 @@ export function MarketIntelligenceApp() {
             </Card>
 
             <Card>
-              <Badge className="bg-slate-100 text-slate-600">2 — CNAEs analisados</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha os CNAEs que melhor representam a análise</h2>
-              <p className="mt-2 text-sm text-slate-500">A lista é gerada automaticamente a partir do CNPJ. Os CNAEs selecionados ajudam a montar buscas no Google Places e a contextualizar a análise.</p>
+              <Badge className="bg-slate-100 text-slate-600">2 — Escopo da análise</Badge>
+              <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha os CNAEs ou descreva o ramo de atividade</h2>
+              <p className="mt-2 text-sm text-slate-500">A lista é gerada automaticamente a partir do CNPJ. Use apenas os CNAEs que fazem sentido para esta análise ou descreva o ramo real da empresa quando o cadastro estiver genérico.</p>
               {!unidade ? <p className="mt-4 text-sm text-slate-500">Carregue os dados da empresa pelo CNPJ para continuar e listar os CNAEs.</p> : <div className="mt-4 grid gap-3">{allCnaes.map((cnae) => <label key={cnaeKey(cnae)} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 hover:bg-slate-50"><input type="checkbox" checked={selectedCnaes.some((item) => cnaeKey(item) === cnaeKey(cnae))} onChange={() => toggleCnae(cnae)} className="mt-1 h-4 w-4" /><span><strong>{cnae.tipo}</strong> · {cnae.codigo ? `${cnae.codigo} — ` : ''}{cnae.descricao}</span></label>)}</div>}
               {unidade && (
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -443,7 +443,7 @@ export function MarketIntelligenceApp() {
               </p>
               {unidade ? (
                 <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm text-blue-900">
-                  Sugestões baseadas em: {selectedCnaes.length ? selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : unidade.cnaePrincipalDescricao}
+                  Sugestões baseadas em: {selectedCnaes.length ? selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : businessActivityDescription.trim() ? 'descrição informada pelo usuário' : unidade.cnaePrincipalDescricao}
                   {businessActivityDescription.trim() ? ` · descrição informada: ${businessActivityDescription.trim()}` : ''}.
                 </div>
               ) : (
