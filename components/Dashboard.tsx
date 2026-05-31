@@ -1,11 +1,10 @@
 'use client';
 
 // Este componente mostra o relatorio final.
-// Ele transforma o resultado calculado pelo servidor em secoes, graficos, listas, mapa e botoes de exportacao.
+// Ele transforma o resultado calculado pelo servidor em secoes, graficos, listas, mapa e botao de impressao.
 import dynamic from 'next/dynamic';
-import { AlertTriangle, MessageSquareText, Sparkles, Star } from 'lucide-react';
+import { AlertTriangle, MessageSquareText, Printer, Sparkles, Star } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ExportButtons } from '@/components/ExportButtons';
 import { Badge, Card } from '@/components/ui';
 import type { AnalysisResult } from '@/lib/types';
 import { formatKm } from '@/lib/utils';
@@ -39,7 +38,7 @@ const sections = [
   ['personas', 'Personas'],
   ['evolucao', 'Evolução Incremental'],
   ['plano', 'Plano de Ação'],
-  ['exportacoes', 'Exportações'],
+  ['imprimir', 'Imprimir Análise'],
   ['fontes', 'Diagnóstico das Fontes']
 ];
 
@@ -50,7 +49,7 @@ function starLabel(rating?: number | null, count?: number | null) {
   return `${rating.toFixed(1)} ★ (${count || 0} avaliações)`;
 }
 
-export function Dashboard({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
+export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boolean }) {
   // Aqui calculamos contadores simples para a parte superior do relatorio.
   // O relatorio ja vem pronto, mas esses numeros ajudam a tela a exibir um resumo rapido.
   const faseColor =
@@ -327,12 +326,19 @@ export function Dashboard({ result, readOnly = false }: { result: AnalysisResult
           </Card>
         </section>
 
-        <section id="exportacoes">
+        <section id="imprimir" className="no-print">
           <Card>
-            <h2 className="text-2xl font-bold text-slate-900">Exportações</h2>
-            <p className="mt-2 text-sm text-slate-500">PDF client-side e XLSX com abas de análise.</p>
+            <h2 className="text-2xl font-bold text-slate-900">Imprimir análise</h2>
+            <p className="mt-2 text-sm text-slate-500">Use este botão para abrir a impressão do navegador. A partir daí, você pode imprimir em papel ou salvar como PDF.</p>
             <div className="mt-5">
-              <ExportButtons result={result} readOnly={readOnly} />
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600"
+              >
+                <Printer className="h-4 w-4" />
+                Imprimir Análise
+              </button>
             </div>
           </Card>
         </section>

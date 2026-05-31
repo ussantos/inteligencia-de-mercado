@@ -40,7 +40,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras, locais relevantes e calor dos CEPs.
 - Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, evolucao incremental e plano de acao.
-- Exportacao PDF e XLSX no navegador.
+- Impressao da analise pelo navegador, permitindo imprimir em papel ou salvar como PDF.
 - Historico e compartilhamento de analises.
 - Autenticacao Clerk protegendo a aplicacao principal na raiz `/`.
 
