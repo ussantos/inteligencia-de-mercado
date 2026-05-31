@@ -8,7 +8,28 @@ import * as XLSX from 'xlsx';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { Download, FileDown, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui';
-import type { AnalysisResult } from '@/lib/types';
+import type { AnalysisResult, BusinessModelCanvas } from '@/lib/types';
+
+const CANVAS_LABELS: Record<keyof BusinessModelCanvas, string> = {
+  propostaDeValor: 'Proposta de valor',
+  segmentosDeClientes: 'Segmentos de clientes',
+  canais: 'Canais',
+  relacionamentoComClientes: 'Relacionamento com clientes',
+  fontesDeReceita: 'Fontes de receita',
+  recursosChave: 'Recursos-chave',
+  atividadesChave: 'Atividades-chave',
+  parceriasChave: 'Parcerias-chave',
+  estruturaDeCustos: 'Estrutura de custos'
+};
+
+function businessModelCanvasRows(result: AnalysisResult) {
+  // A planilha transforma cada item do Canvas em uma linha simples para facilitar filtro e leitura.
+  const canvas = (result as AnalysisResult & { businessModelCanvas?: Partial<BusinessModelCanvas> }).businessModelCanvas || {};
+  return Object.entries(CANVAS_LABELS).flatMap(([key, label]) => {
+    const items = Array.isArray(canvas[key as keyof BusinessModelCanvas]) ? canvas[key as keyof BusinessModelCanvas] as string[] : [];
+    return items.map((item, index) => ({ bloco: label, ordem: index + 1, item }));
+  });
+}
 
 export function ExportButtons({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
   const { getToken } = useAuth();
@@ -37,6 +58,7 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.perfilEconomico), 'Perfil Econômico');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.personas), 'Personas');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.recomendacoesInteligentes ? [result.recomendacoesInteligentes] : []), 'Recomendações IA');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(businessModelCanvasRows(result)), 'Canvas Estratégico');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(result.planoDeAcao), 'Plano de Ação');
     XLSX.writeFile(wb, 'analise-inteligencia-mercado.xlsx');
   }

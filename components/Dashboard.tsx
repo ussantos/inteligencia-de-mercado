@@ -7,7 +7,7 @@ import { AlertTriangle, MessageSquareText, Printer, Sparkles, Star } from 'lucid
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge, Card } from '@/components/ui';
 import { PrintableReport } from '@/components/PrintableReport';
-import type { AnalysisResult } from '@/lib/types';
+import type { AnalysisResult, BusinessModelCanvas } from '@/lib/types';
 import { formatKm } from '@/lib/utils';
 
 const MarketMap = dynamic(
@@ -36,6 +36,7 @@ const sections = [
   ['obstaculos', 'Obstáculos de Matrícula'],
   ['concorrentes', 'Concorrentes e Locais'],
   ['posicionamento', 'Posicionamento da Empresa'],
+  ['canvas', 'Canvas Estratégico'],
   ['personas', 'Personas'],
   ['evolucao', 'Evolução Incremental'],
   ['plano', 'Plano de Ação'],
@@ -44,6 +45,18 @@ const sections = [
 ];
 
 const CHART_COLORS = ['#2563eb', '#16a34a', '#f97316', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#be185d'];
+
+const CANVAS_BLOCKS: Array<{ key: keyof BusinessModelCanvas; title: string; tone: string }> = [
+  { key: 'propostaDeValor', title: 'Proposta de valor', tone: 'border-blue-200 bg-blue-50' },
+  { key: 'segmentosDeClientes', title: 'Segmentos de clientes', tone: 'border-emerald-200 bg-emerald-50' },
+  { key: 'canais', title: 'Canais', tone: 'border-orange-200 bg-orange-50' },
+  { key: 'relacionamentoComClientes', title: 'Relacionamento', tone: 'border-purple-200 bg-purple-50' },
+  { key: 'fontesDeReceita', title: 'Fontes de receita', tone: 'border-teal-200 bg-teal-50' },
+  { key: 'recursosChave', title: 'Recursos-chave', tone: 'border-slate-200 bg-slate-50' },
+  { key: 'atividadesChave', title: 'Atividades-chave', tone: 'border-cyan-200 bg-cyan-50' },
+  { key: 'parceriasChave', title: 'Parcerias-chave', tone: 'border-lime-200 bg-lime-50' },
+  { key: 'estruturaDeCustos', title: 'Estrutura de custos', tone: 'border-rose-200 bg-rose-50' }
+];
 
 function starLabel(rating?: number | null, count?: number | null) {
   if (!rating) return 'Sem avaliação Google disponível';
@@ -77,6 +90,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
     respostaRecomendada: 'Responda com diferencial concreto, prazo, prova social e próximo passo simples.',
     mensagemPronta: `Olá! A ${unitName} atende sua região com orientação clara e resposta rápida. Posso te mostrar a melhor opção para o que você precisa hoje?`
   };
+  const businessModelCanvas = normalizeBusinessModelCanvas(result);
 
   return (
     <div className="report-shell grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -258,6 +272,19 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
           </Card>
         </section>
 
+        <section id="canvas">
+          <Card>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-orange-500" />
+              <h2 className="text-2xl font-bold text-slate-900">Canvas Estratégico do Negócio</h2>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Síntese automática do modelo de negócio sugerido pela análise. Ela cruza escopo informado, região, concorrentes, canais, parcerias e próximos passos sem exigir que o usuário preencha um Canvas manualmente.
+            </p>
+            <BusinessModelCanvasGrid canvas={businessModelCanvas} />
+          </Card>
+        </section>
+
         <section id="personas">
           <Card>
             <h2 className="text-2xl font-bold text-slate-900">Personas do Público-Alvo</h2>
@@ -361,6 +388,50 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         </section>
       </div>
       <PrintableReport result={result} />
+    </div>
+  );
+}
+
+function normalizeBusinessModelCanvas(result: AnalysisResult): BusinessModelCanvas {
+  // Relatorios antigos podem nao ter este campo salvo no banco.
+  // Este fallback garante que a tela continue abrindo e ainda mostre um Canvas util.
+  const saved = (result as AnalysisResult & { businessModelCanvas?: Partial<BusinessModelCanvas> }).businessModelCanvas || {};
+  const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
+  const segment = result.businessActivityDescription || result.selectedCnaes.map((cnae) => cnae.descricao).join(', ') || result.unidade.cnaePrincipalDescricao;
+  const topBairro = result.afinidadePorBairro[0]?.bairro || result.unidade.bairro;
+  const partner = result.strategicPlaces.find((place) => place.categoriaEstrategica === 'Oportunidade de parceria' || place.categoriaEstrategica === 'Polo gerador de público');
+  const fallback: BusinessModelCanvas = {
+    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniência local e prova social para ${topBairro}.`],
+    segmentosDeClientes: [`Clientes próximos de ${topBairro}.`, 'Compradores que pesquisam e comparam opções no Google.'],
+    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', 'Campanhas por raio nos bairros prioritários.'],
+    relacionamentoComClientes: ['Atendimento consultivo, rápido e com próximo passo simples.', 'Follow-up por bairro, origem do lead e objeção registrada.'],
+    fontesDeReceita: [`Venda direta de ${segment}.`, 'Pacotes, planos, recorrência ou serviços complementares quando fizer sentido.'],
+    recursosChave: ['Perfil Google atualizado, argumentos comerciais e registro de leads.', 'Equipe ou responsável por resposta rápida.'],
+    atividadesChave: ['Monitorar concorrentes, avaliações e objeções.', 'Testar mensagens locais e medir conversão por origem.'],
+    parceriasChave: [partner ? `${partner.nome} como possível parceiro ou polo de público.` : 'Negócios complementares da região para indicação mútua.'],
+    estruturaDeCustos: ['Mídia local de baixo orçamento para testes.', 'Tempo de atendimento, follow-up, materiais e ferramentas de operação.']
+  };
+
+  return CANVAS_BLOCKS.reduce((canvas, block) => {
+    const values = Array.isArray(saved[block.key]) ? saved[block.key] as string[] : [];
+    canvas[block.key] = values.length ? values : fallback[block.key];
+    return canvas;
+  }, {} as BusinessModelCanvas);
+}
+
+function BusinessModelCanvasGrid({ canvas }: { canvas: BusinessModelCanvas }) {
+  return (
+    <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      {CANVAS_BLOCKS.map((block) => (
+        <div key={block.key} className={`rounded-2xl border p-4 ${block.tone}`}>
+          <h3 className="font-bold text-slate-900">{block.title}</h3>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
+            {canvas[block.key].map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

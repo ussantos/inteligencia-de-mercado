@@ -193,7 +193,8 @@ body {
   .print-page > .print-block,
   .print-page > h2 + .print-block,
   .print-page > h2 + .print-two-columns,
-  .print-page > h2 + .print-swot {
+  .print-page > h2 + .print-swot,
+  .print-page > h2 + .print-canvas-grid {
     margin-top: 5mm;
   }
 
@@ -207,6 +208,32 @@ body {
     color: #0f172a;
     font-size: 12pt;
     margin-bottom: 2mm;
+  }
+
+  .print-page-intro {
+    color: #475569;
+    font-size: 9.2pt !important;
+    margin-top: 2mm !important;
+  }
+
+  .print-canvas-grid {
+    display: grid;
+    gap: 3mm;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 5mm;
+  }
+
+  .print-canvas-grid .print-block {
+    padding: 3.4mm;
+  }
+
+  .print-canvas-grid .print-block h3 {
+    font-size: 10.5pt;
+  }
+
+  .print-canvas-grid .print-list li {
+    font-size: 8.3pt;
+    line-height: 1.3;
   }
 
   .print-block p,

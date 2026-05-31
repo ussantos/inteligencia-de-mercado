@@ -46,7 +46,8 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Busca de concorrentes e locais relevantes via Google Places API.
 - Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras e locais relevantes.
 - Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
-- Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, evolucao incremental e plano de acao.
+- Canvas Estrategico do Negocio gerado automaticamente a partir da analise, com proposta de valor, segmentos, canais, relacionamento, receitas, recursos, atividades, parcerias e custos.
+- Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, Canvas Estrategico, evolucao incremental e plano de acao.
 - Impressao da analise com layout especifico para PDF, em folha A4 retrato, com mapa esquematico, graficos, quebras de pagina controladas e secoes compactas para evitar cortes no meio do conteudo.
 - Historico e compartilhamento de analises.
 - Autenticacao Clerk protegendo a aplicacao principal na raiz `/`.
@@ -168,7 +169,7 @@ Opcionais:
 - `NOMINATIM_MONTHLY_BUDGET`
 - `OVERPASS_MONTHLY_BUDGET`
 
-Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
+Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes**, **Canvas Estrategico do Negocio** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.
 
@@ -598,7 +599,8 @@ The tool transforms public data and simple operational data into a practical mar
 - Competitor and relevant-place search through Google Places API.
 - Google Maps view with layers for the company, customer ZIP/postal codes, competitors, barriers, and relevant places.
 - Neighborhood ranking, conversion barriers, positioning, and personas.
-- Optional OpenAI enrichment for smarter recommendations, positioning, incremental evolution, and action planning.
+- Automatically generated Strategic Business Canvas with value proposition, segments, channels, relationships, revenue, resources, activities, partnerships, and costs.
+- Optional OpenAI enrichment for smarter recommendations, positioning, Strategic Business Canvas, incremental evolution, and action planning.
 - Print-ready analysis layout for PDF, using A4 portrait pages, schematic map, charts, controlled page breaks, and compact sections to avoid splitting content in the middle.
 - Analysis history and shareable reports.
 - Clerk authentication protecting the main application at `/`.
@@ -718,7 +720,7 @@ Optional:
 - `NOMINATIM_MONTHLY_BUDGET`
 - `OVERPASS_MONTHLY_BUDGET`
 
-When `OPENAI_API_KEY` is configured, the application sends a summary of the analysis to AI and improves the **Smart Recommendations** and **Action Plan — Next Steps** sections with more specific guidance by neighborhood, competitors, CNAEs, analysis radius, and limitations found. Without this key, the report continues to work with local rules.
+When `OPENAI_API_KEY` is configured, the application sends a summary of the analysis to AI and improves the **Smart Recommendations**, **Strategic Business Canvas**, and **Action Plan — Next Steps** sections with more specific guidance by neighborhood, competitors, CNAEs, analysis radius, and limitations found. Without this key, the report continues to work with local rules.
 
 Note about `AZURE_STORAGE_CONTAINER_NAME`: this value must be the container name, for example `uploads-temp`, not the storage account name.
 

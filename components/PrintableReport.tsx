@@ -3,10 +3,22 @@
 // Este componente monta uma versao do relatorio feita so para impressao.
 // A tela interativa continua existindo, mas o navegador imprime esta estrutura compacta em A4 retrato.
 import type { AnalysisResult } from '@/lib/types';
+import type { BusinessModelCanvas } from '@/lib/types';
 import type { ReactNode } from 'react';
 import { formatKm } from '@/lib/utils';
 
 const PRINT_CHART_COLORS = ['#2563eb', '#16a34a', '#f97316', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#be185d'];
+const PRINT_CANVAS_BLOCKS: Array<{ key: keyof BusinessModelCanvas; title: string }> = [
+  { key: 'propostaDeValor', title: 'Proposta de valor' },
+  { key: 'segmentosDeClientes', title: 'Segmentos de clientes' },
+  { key: 'canais', title: 'Canais' },
+  { key: 'relacionamentoComClientes', title: 'Relacionamento' },
+  { key: 'fontesDeReceita', title: 'Fontes de receita' },
+  { key: 'recursosChave', title: 'Recursos-chave' },
+  { key: 'atividadesChave', title: 'Atividades-chave' },
+  { key: 'parceriasChave', title: 'Parcerias-chave' },
+  { key: 'estruturaDeCustos', title: 'Estrutura de custos' }
+];
 const PRINT_MAP_WIDTH = 1024;
 const PRINT_MAP_HEIGHT = 512;
 const PRINT_MAP_TILE_SIZE = 256;
@@ -208,6 +220,31 @@ function PrintCategoryChart({ result }: { result: AnalysisResult }) {
   return <PrintBarChart title="Locais por categoria estratégica" rows={rows.length ? rows : [{ label: 'Sem locais mapeados', value: 0 }]} />;
 }
 
+function normalizePrintBusinessModelCanvas(result: AnalysisResult): BusinessModelCanvas {
+  // A impressao tambem precisa abrir relatorios antigos, criados antes do Canvas existir.
+  const saved = (result as AnalysisResult & { businessModelCanvas?: Partial<BusinessModelCanvas> }).businessModelCanvas || {};
+  const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
+  const segment = result.businessActivityDescription || result.selectedCnaes.map((cnae) => cnae.descricao).join(', ') || result.unidade.cnaePrincipalDescricao;
+  const topBairro = result.afinidadePorBairro[0]?.bairro || result.unidade.bairro;
+  const fallback: BusinessModelCanvas = {
+    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniencia local e prova social para ${topBairro}.`],
+    segmentosDeClientes: [`Clientes proximos de ${topBairro}.`, 'Compradores que pesquisam e comparam opcoes no Google.'],
+    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', 'Campanhas por raio nos bairros prioritarios.'],
+    relacionamentoComClientes: ['Atendimento consultivo, rapido e com proximo passo simples.', 'Follow-up por bairro, origem do lead e objecao registrada.'],
+    fontesDeReceita: [`Venda direta de ${segment}.`, 'Pacotes, planos, recorrencia ou servicos complementares quando fizer sentido.'],
+    recursosChave: ['Perfil Google atualizado, argumentos comerciais e registro de leads.', 'Equipe ou responsavel por resposta rapida.'],
+    atividadesChave: ['Monitorar concorrentes, avaliacoes e objecoes.', 'Testar mensagens locais e medir conversao por origem.'],
+    parceriasChave: ['Negocios complementares da regiao para indicacao mutua.'],
+    estruturaDeCustos: ['Midia local de baixo orçamento para testes.', 'Tempo de atendimento, follow-up, materiais e ferramentas de operacao.']
+  };
+
+  return PRINT_CANVAS_BLOCKS.reduce((canvas, block) => {
+    const values = Array.isArray(saved[block.key]) ? saved[block.key] as string[] : [];
+    canvas[block.key] = values.length ? values : fallback[block.key];
+    return canvas;
+  }, {} as BusinessModelCanvas);
+}
+
 export function PrintableReport({ result }: { result: AnalysisResult }) {
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
   const direct = result.strategicPlaces.filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente direto')).length;
@@ -221,6 +258,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
     mensagemPronta: `A ${unitName} atende sua regiao com orientacao clara e resposta rapida. Posso mostrar a melhor opcao para o que voce precisa hoje?`
   };
   const position = result.posicionamentoUnidade;
+  const businessModelCanvas = normalizePrintBusinessModelCanvas(result);
   const topPlaces = result.strategicPlaces.slice(0, 12);
   const topAffinity = result.afinidadePorBairro.slice(0, 6);
   const topEconomic = result.perfilEconomico.slice(0, 6);
@@ -409,6 +447,18 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
             </div>
           ))}
         </PrintBlock>
+      </PrintPage>
+
+      <PrintPage>
+        <h2>Canvas do modelo de negocio</h2>
+        <p className="print-page-intro">Sintese aplicada do modelo de negocio sugerido pela analise, considerando escopo informado, regiao, concorrentes, canais e possiveis parcerias.</p>
+        <div className="print-canvas-grid">
+          {PRINT_CANVAS_BLOCKS.map((block) => (
+            <PrintBlock key={block.key} title={block.title}>
+              <PrintList items={businessModelCanvas[block.key]} limit={4} />
+            </PrintBlock>
+          ))}
+        </div>
       </PrintPage>
 
       <PrintPage>

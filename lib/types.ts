@@ -114,6 +114,18 @@ export interface Persona {
   mensagemRecomendada: string;
 }
 
+export interface BusinessModelCanvas {
+  propostaDeValor: string[];
+  segmentosDeClientes: string[];
+  canais: string[];
+  relacionamentoComClientes: string[];
+  fontesDeReceita: string[];
+  recursosChave: string[];
+  atividadesChave: string[];
+  parceriasChave: string[];
+  estruturaDeCustos: string[];
+}
+
 export interface AnalysisResult {
   id?: string;
   createdAt: string;
@@ -178,6 +190,7 @@ export interface AnalysisResult {
     respostaRecomendada: string;
     mensagemPronta: string;
   };
+  businessModelCanvas: BusinessModelCanvas;
   planoDeAcao: Array<{
     prioridade: number;
     acao: string;

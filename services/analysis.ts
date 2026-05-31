@@ -9,7 +9,7 @@ import { geocodeCep } from '@/services/geocode';
 import { getStrategicPlaces } from '@/services/google-places';
 import { enhanceWithOpenAI } from '@/services/ai';
 import { DEFAULT_COMPETITOR_TYPES, type CompetitorType } from '@/lib/competitor-types';
-import type { AnalysisResult, CepPoint, CnaeOption, NeighborhoodScore, Persona, StrategicPlace, UnidadeNegocio } from '@/lib/types';
+import type { AnalysisResult, BusinessModelCanvas, CepPoint, CnaeOption, NeighborhoodScore, Persona, StrategicPlace, UnidadeNegocio } from '@/lib/types';
 
 function median(values: number[]) {
   // Mediana e o numero que fica no meio da lista ordenada.
@@ -285,6 +285,100 @@ function buildSmartRecommendations(input: {
   };
 }
 
+function uniqueFilled(values: Array<string | null | undefined>, limit = 4) {
+  // Remove textos vazios e repetidos para o Canvas ficar curto e facil de ler.
+  const seen = new Set<string>();
+  return values
+    .map((value) => String(value || '').trim())
+    .filter((value) => {
+      if (!value || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function buildBusinessModelCanvas(input: {
+  unitName: string;
+  analysisSegment: string;
+  topBairro: string;
+  analysisRadiusKm: number;
+  strategicPlaces: StrategicPlace[];
+  neighborhoodScores: NeighborhoodScore[];
+  directCount: number;
+  competitorTypes: CompetitorType[];
+}): BusinessModelCanvas {
+  // O Canvas resume o modelo de negocio sugerido pela analise.
+  // Ele nao pede trabalho extra ao usuario: transforma os dados ja coletados em uma visao executiva.
+  const partnerPlaces = input.strategicPlaces.filter((place) => place.categoriaEstrategica === 'Oportunidade de parceria' || place.categoriaEstrategica === 'Polo gerador de público');
+  const topNeighborhoods = input.neighborhoodScores.slice(0, 3).map((score) => score.bairro);
+  const selectedTypeSummary = input.competitorTypes.join(', ');
+  const strongCompetitor = input.strategicPlaces
+    .filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente'))
+    .sort((a, b) => (b.userRatingCount || 0) - (a.userRatingCount || 0) || (b.rating || 0) - (a.rating || 0))[0];
+  const competitorReference = strongCompetitor
+    ? `comparação clara contra ${strongCompetitor.nome}${strongCompetitor.rating ? ` (${strongCompetitor.rating.toFixed(1)} no Google)` : ''}`
+    : 'comparação objetiva contra alternativas locais';
+
+  return {
+    propostaDeValor: uniqueFilled([
+      `${input.unitName} pode comunicar uma solução local de ${input.analysisSegment} com atendimento claro, resposta rápida e conveniência para ${input.topBairro}.`,
+      `Diferenciação por prova social, qualidade percebida e ${competitorReference}.`,
+      input.directCount > 0
+        ? `Oferta explicada de forma simples para reduzir comparação apenas por preço em um raio de ${input.analysisRadiusKm} km.`
+        : `Presença local em um raio de ${input.analysisRadiusKm} km onde a baixa concorrência direta pode permitir validação rápida.`
+    ]),
+    segmentosDeClientes: uniqueFilled([
+      `Clientes e decisores próximos de ${input.topBairro}.`,
+      ...topNeighborhoods.map((bairro) => `Público com afinidade operacional em ${bairro}.`),
+      'Compradores que pesquisam no Google antes de entrar em contato.',
+      'Clientes com urgência que valorizam resposta rápida, prazo claro e baixo atrito.'
+    ]),
+    canais: uniqueFilled([
+      'Google Maps e busca orgânica local.',
+      'WhatsApp ou canal direto de atendimento.',
+      'Campanhas por raio nos bairros com maior afinidade.',
+      partnerPlaces.length ? 'Parcerias e indicações com locais complementares mapeados.' : 'Indicações locais e prova social em canais digitais.'
+    ]),
+    relacionamentoComClientes: uniqueFilled([
+      'Atendimento consultivo com próximo passo simples.',
+      'Resposta rápida para dúvidas de preço, prazo, disponibilidade e diferenciais.',
+      'Follow-up segmentado por bairro, origem do lead e objeção registrada.',
+      'Uso de avaliações, depoimentos e casos reais para reduzir risco percebido.'
+    ]),
+    fontesDeReceita: uniqueFilled([
+      `Venda direta de ${input.analysisSegment}.`,
+      'Pacotes, planos, recorrência ou contratos quando fizer sentido para o negócio.',
+      'Upsell ou serviços complementares após a primeira compra.',
+      'Receita por parcerias, indicações ou ações conjuntas quando houver parceiros locais.'
+    ]),
+    recursosChave: uniqueFilled([
+      'Equipe ou responsável por atendimento rápido e registro de objeções.',
+      'Perfil Google bem cuidado, com fotos, descrição, avaliações e dados corretos.',
+      'Argumentos comerciais comparando diferenciais reais frente aos concorrentes.',
+      'Base simples de leads por bairro, canal e etapa do funil.'
+    ]),
+    atividadesChave: uniqueFilled([
+      'Monitorar concorrentes e avaliações no raio definido.',
+      selectedTypeSummary ? `Revisar resultados ligados a ${selectedTypeSummary} para manter o escopo fiel ao que o usuário escolheu.` : undefined,
+      'Testar mensagens locais por bairro e tipo de concorrente selecionado.',
+      'Medir leads, respostas, orçamentos e conversões por origem.',
+      'Atualizar argumentos comerciais conforme objeções reais do atendimento.'
+    ]),
+    parceriasChave: uniqueFilled([
+      ...partnerPlaces.slice(0, 3).map((place) => `${place.nome} como possível parceiro ou polo de público.`),
+      partnerPlaces.length ? 'Ações conjuntas com locais que concentram público compatível.' : 'Negócios complementares da região para indicação mútua.',
+      'Fornecedores, influenciadores locais ou canais comunitários com acesso ao público-alvo.'
+    ]),
+    estruturaDeCustos: uniqueFilled([
+      'Mídia local de baixo orçamento para testar bairros antes de ampliar verba.',
+      'Tempo de atendimento, follow-up e organização de leads.',
+      'Produção de provas comerciais: fotos, depoimentos, páginas, mensagens e materiais.',
+      'Ferramentas de operação, CRM simples ou automações leves para manter consistência.'
+    ])
+  };
+}
+
 export async function runMarketAnalysis(input: {
   userId: string;
   unidade: UnidadeNegocio;
@@ -444,6 +538,7 @@ export async function runMarketAnalysis(input: {
       'Censo 2022 pode enriquecer a análise, mas exige ETL com setor censitário, malha territorial e cruzamento geográfico.'
     ],
     recomendacoesInteligentes: buildSmartRecommendations({ unitName, topBairro, strategicPlaces, directCount, analysisRadiusKm }),
+    businessModelCanvas: buildBusinessModelCanvas({ unitName, analysisSegment, topBairro, analysisRadiusKm, strategicPlaces, neighborhoodScores, directCount, competitorTypes }),
     planoDeAcao: [
       { prioridade: 1, acao: `Priorizar os bairros com maior afinidade dentro de ${analysisRadiusKm} km para campanhas e follow-up ativo.`, tipo: 'Testar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '7 a 14 dias', custoEstimado: 'Baixo', recursoGratuitoConfirmado: false, responsavelSugerido: 'Comercial/Marketing', kpiParaMedirSucesso: 'Leads qualificados por bairro' },
       { prioridade: 2, acao: 'Criar argumento comercial comparando a empresa com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },

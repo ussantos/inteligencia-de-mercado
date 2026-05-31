@@ -36,6 +36,7 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
     analysisRadiusKm: base.analysisRadiusKm,
     faseMercadoLocal: base.faseMercadoLocal,
     planoLocalInicial: base.planoDeAcao,
+    canvasLocalInicial: base.businessModelCanvas,
     diagnosticoFontesPublicas: base.diagnosticoFontesPublicas,
     topBairros: base.afinidadePorBairro.slice(0, 10),
     obstaculos: base.obstaculosMatricula.slice(0, 10),
@@ -71,6 +72,12 @@ Para o campo "recomendacoesInteligentes", seja ainda mais sintético:
 - A mensagem pronta deve poder ser usada em WhatsApp, anúncio local ou abordagem comercial sem edição pesada.
 - A objeção e a resposta devem ajudar atendimento/vendas a decidir o que falar primeiro.
 
+Para o campo "businessModelCanvas", gere um Canvas do Modelo de Negócio aplicado:
+- Use os mesmos dados, escopo informado pelo usuário, concorrentes, bairros e limitações.
+- Não transforme o Canvas em tarefa para o usuário preencher; entregue a síntese já pronta.
+- Cada bloco deve ter de 2 a 4 frases curtas e acionáveis.
+- Não invente parceiros, canais, bairros, números, avaliações ou fontes de receita que não façam sentido para o segmento informado.
+
 Responda APENAS JSON válido com os campos camelCase abaixo. Não invente dados estatísticos. Quando houver limitação, declare a limitação.
 
 {
@@ -96,6 +103,17 @@ Responda APENAS JSON válido com os campos camelCase abaixo. Não invente dados 
     "objecaoProvavel": "",
     "respostaRecomendada": "",
     "mensagemPronta": ""
+  },
+  "businessModelCanvas": {
+    "propostaDeValor": [],
+    "segmentosDeClientes": [],
+    "canais": [],
+    "relacionamentoComClientes": [],
+    "fontesDeReceita": [],
+    "recursosChave": [],
+    "atividadesChave": [],
+    "parceriasChave": [],
+    "estruturaDeCustos": []
   },
   "planoDeAcao": [
     {
