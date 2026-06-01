@@ -13,7 +13,7 @@ import { Badge, Button, Card, Input } from '@/components/ui';
 import { normalizeCep, isValidCep, detectCepColumn } from '@/lib/cep';
 import { formatCep, formatCnpj } from '@/lib/utils';
 import { COMPETITOR_TYPES, DEFAULT_COMPETITOR_TYPES, type CompetitorType } from '@/lib/competitor-types';
-import type { AnalysisResult, CnaeOption, UnidadeNegocio } from '@/lib/types';
+import type { AnalysisResult, UnidadeNegocio } from '@/lib/types';
 
 interface ParsedCeps {
   ceps: string[];
@@ -77,26 +77,22 @@ async function parseFile(file: File): Promise<ParsedCeps> {
   return { ceps: [], errors: ['Formato de arquivo não suportado. Use .csv ou .xlsx'], sensitiveWarning: false };
 }
 
-function cnaeKey(cnae: CnaeOption) {
-  return `${cnae.codigo}:${cnae.descricao}:${cnae.tipo}`;
-}
-
 function clampAnalysisRadius(value: number) {
-  // O servidor aceita no maximo 50 km.
-  // Esta funcao impede que a tela envie 830 km, texto vazio ou outro valor fora do limite.
-  if (!Number.isFinite(value)) return 8;
-  return Math.min(50, Math.max(1, Math.round(value)));
+  // O servidor aceita de 1 a 20 km.
+  // Esta funcao impede que a tela envie texto vazio, 830 km ou outro valor fora do limite.
+  if (!Number.isFinite(value)) return 4;
+  return Math.min(20, Math.max(1, Math.round(value)));
 }
 
 function normalizeText(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-function inferCompetitorOptions(cnaes: CnaeOption[]): Array<{ type: CompetitorType; reason: string; suggested: boolean }> {
-  // A lista base continua sendo a mesma, mas a ordem e as dicas mudam conforme os CNAEs carregados.
+function inferCompetitorOptions(activityDescription: string): Array<{ type: CompetitorType; reason: string; suggested: boolean }> {
+  // A lista base continua sendo a mesma, mas a ordem e as dicas mudam conforme o ramo informado.
   // "Todos" permanece como padrao porque e a escolha mais segura para quem quer uma primeira analise ampla.
-  const text = normalizeText(cnaes.map((cnae) => `${cnae.codigo} ${cnae.descricao}`).join(' '));
-  const suggested = new Set<CompetitorType>(['Todos', 'Concorrentes diretos pelo CNAE', 'Concorrentes locais similares', 'Concorrentes bem avaliados no Google']);
+  const text = normalizeText(activityDescription);
+  const suggested = new Set<CompetitorType>(['Todos', 'Concorrentes diretos do ramo informado', 'Concorrentes locais similares', 'Concorrentes bem avaliados no Google']);
 
   if (/educa|ensino|trein|curso|idioma|informatica|escola|aula/.test(text)) {
     ['Polos geradores de público', 'Negócios complementares para parceria', 'Marketplaces, delivery e canais digitais', 'Substitutos e alternativas de compra'].forEach((type) => suggested.add(type as CompetitorType));
@@ -111,9 +107,9 @@ function inferCompetitorOptions(cnaes: CnaeOption[]): Array<{ type: CompetitorTy
   }
 
   const reasons: Record<CompetitorType, string> = {
-    Todos: 'Recomendado para a primeira análise: combina CNAEs, segmento, concorrentes diretos, indiretos e locais relevantes.',
-    'Concorrentes diretos pelo CNAE': 'Usa os CNAEs selecionados para buscar empresas com oferta próxima à sua.',
-    'Concorrentes locais similares': 'Procura negócios parecidos na mesma região, mesmo quando o CNAE cadastrado é diferente.',
+    Todos: 'Recomendado para a primeira análise: combina ramo informado, concorrentes diretos, alternativas indiretas e locais relevantes.',
+    'Concorrentes diretos do ramo informado': 'Busca empresas com oferta próxima ao ramo descrito pelo usuário.',
+    'Concorrentes locais similares': 'Procura negócios parecidos na mesma região, mesmo quando usam outra descrição pública.',
     'Redes e franquias do setor': 'Ajuda a identificar marcas estruturadas que competem por preço, presença ou confiança.',
     'Substitutos e alternativas de compra': 'Mapeia opções que resolvem o mesmo problema do cliente de outro jeito.',
     'Prestadores autônomos e pequenos negócios': 'Encontra alternativas menores, profissionais independentes e ofertas de bairro.',
@@ -137,10 +133,9 @@ export function MarketIntelligenceApp() {
   const { signOut } = useClerk();
   const [cnpj, setCnpj] = useState('');
   const [unidade, setUnidade] = useState<UnidadeNegocio | null>(null);
-  const [selectedCnaes, setSelectedCnaes] = useState<CnaeOption[]>([]);
   const [businessActivityDescription, setBusinessActivityDescription] = useState('');
   const [competitorTypes, setCompetitorTypes] = useState<CompetitorType[]>(DEFAULT_COMPETITOR_TYPES);
-  const [analysisRadiusKm, setAnalysisRadiusKm] = useState(8);
+  const [analysisRadiusKm, setAnalysisRadiusKm] = useState(4);
   const [ceps, setCeps] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [sensitiveWarning, setSensitiveWarning] = useState(false);
@@ -152,10 +147,9 @@ export function MarketIntelligenceApp() {
   const [uploadedBlob, setUploadedBlob] = useState<UploadedBlob | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
-  const allCnaes = useMemo(() => unidade?.cnaes?.length ? unidade.cnaes : unidade ? [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }] : [], [unidade]);
-  const competitorOptions = useMemo(() => inferCompetitorOptions(selectedCnaes.length ? selectedCnaes : allCnaes), [allCnaes, selectedCnaes]);
+  const competitorOptions = useMemo(() => inferCompetitorOptions(businessActivityDescription), [businessActivityDescription]);
   const safeAnalysisRadiusKm = clampAnalysisRadius(analysisRadiusKm);
-  const hasMarketScope = selectedCnaes.length > 0 || businessActivityDescription.trim().length > 0;
+  const hasMarketScope = businessActivityDescription.trim().length >= 3;
   const canAnalyze = Boolean(unidade && hasMarketScope && competitorTypes.length > 0 && !loadingAnalysis);
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
 
@@ -166,15 +160,6 @@ export function MarketIntelligenceApp() {
       window.location.replace('/sign-in');
     }
   }, [isLoaded, isSignedIn]);
-
-  useEffect(() => {
-    // Quando o CNPJ e encontrado, selecionamos automaticamente o CNAE principal.
-    // Isso ajuda o usuario a comecar sem precisar marcar tudo manualmente.
-    if (unidade) {
-      const cnaes = unidade.cnaes?.length ? unidade.cnaes : [{ codigo: unidade.cnaePrincipalCodigo, descricao: unidade.cnaePrincipalDescricao, tipo: 'Principal' as const }];
-      setSelectedCnaes(cnaes.filter((cnae) => cnae.tipo === 'Principal').slice(0, 1));
-    }
-  }, [unidade]);
 
   async function jsonAuthHeaders() {
     // O Azure/Next pode nao repassar cookies do Clerk do jeito esperado em todos os cenarios.
@@ -254,14 +239,6 @@ export function MarketIntelligenceApp() {
     }
   }
 
-  function toggleCnae(cnae: CnaeOption) {
-    setSelectedCnaes((current) => {
-      const key = cnaeKey(cnae);
-      if (current.some((item) => cnaeKey(item) === key)) return current.filter((item) => cnaeKey(item) !== key);
-      return [...current, cnae];
-    });
-  }
-
   function toggleCompetitorType(type: CompetitorType) {
     setCompetitorTypes((current) => {
       if (type === 'Todos') return ['Todos'];
@@ -310,7 +287,7 @@ export function MarketIntelligenceApp() {
   }
 
   async function startAnalysis() {
-    // Aqui juntamos CNPJ, CNAEs, tipos de concorrentes, raio e CEPs.
+    // Aqui juntamos CNPJ, ramo informado, tipos de concorrentes, raio e CEPs opcionais.
     // O servidor recebe esse pacote e devolve o relatorio completo.
     if (!unidade) return;
     const radiusKm = clampAnalysisRadius(analysisRadiusKm);
@@ -322,7 +299,7 @@ export function MarketIntelligenceApp() {
         method: 'POST',
         credentials: 'include',
         headers: await jsonAuthHeaders(),
-        body: JSON.stringify({ unidade, ceps: uniqueCeps, selectedCnaes, businessActivityDescription, competitorTypes, analysisRadiusKm: radiusKm })
+        body: JSON.stringify({ unidade, ceps: uniqueCeps, businessActivityDescription, competitorTypes, analysisRadiusKm: radiusKm })
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
@@ -389,7 +366,7 @@ export function MarketIntelligenceApp() {
             <Card>
               <Badge className="bg-slate-100 text-slate-600">1 — CNPJ da Empresa</Badge>
               <h2 className="mt-4 text-2xl font-bold text-slate-900">Informe o CNPJ da empresa</h2>
-              <p className="mt-2 text-sm text-slate-500">Carregue os dados da empresa antes de continuar. O sistema consulta bases públicas, identifica endereço, CEP e CNAEs, e usa esses dados para orientar a busca de concorrentes na região.</p>
+              <p className="mt-2 text-sm text-slate-500">Carregue os dados da empresa antes de continuar. O sistema consulta bases públicas para identificar endereço e CEP, que servem como ponto central do raio de análise.</p>
               <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
                 <Input value={cnpj} onChange={(event) => setCnpj(event.target.value)} placeholder="CNPJ — ex: 12.345.678/0001-90" />
                 <Button className="whitespace-normal text-center md:whitespace-nowrap" onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>{loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />} Carregar dados da minha empresa</Button>
@@ -403,7 +380,6 @@ export function MarketIntelligenceApp() {
                     <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Não informado'}</p>
                     <p><strong>CNPJ:</strong> {formatCnpj(unidade.cnpj)}</p>
                     <p><strong>Situação:</strong> {unidade.situacaoCadastral}</p>
-                    <p><strong>CNAE Principal:</strong> {unidade.cnaePrincipalCodigo} — {unidade.cnaePrincipalDescricao}</p>
                     <p><strong>CEP detectado via CNPJ:</strong> {formatCep(unidade.cep)}</p>
                     <p className="md:col-span-2"><strong>Endereço:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
                   </div>
@@ -413,13 +389,12 @@ export function MarketIntelligenceApp() {
 
             <Card>
               <Badge className="bg-slate-100 text-slate-600">2 — Escopo da análise</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha os CNAEs ou descreva o ramo de atividade</h2>
-              <p className="mt-2 text-sm text-slate-500">A lista é gerada automaticamente a partir do CNPJ. Use apenas os CNAEs que fazem sentido para esta análise ou descreva o ramo real da empresa quando o cadastro estiver genérico.</p>
-              {!unidade ? <p className="mt-4 text-sm text-slate-500">Carregue os dados da empresa pelo CNPJ para continuar e listar os CNAEs.</p> : <div className="mt-4 grid gap-3">{allCnaes.map((cnae) => <label key={cnaeKey(cnae)} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-3 hover:bg-slate-50"><input type="checkbox" checked={selectedCnaes.some((item) => cnaeKey(item) === cnaeKey(cnae))} onChange={() => toggleCnae(cnae)} className="mt-1 h-4 w-4" /><span><strong>{cnae.tipo}</strong> · {cnae.codigo ? `${cnae.codigo} — ` : ''}{cnae.descricao}</span></label>)}</div>}
+              <h2 className="mt-4 text-xl font-bold text-slate-900">Descreva o ramo de atividade que deve ser analisado</h2>
+              <p className="mt-2 text-sm text-slate-500">O CNPJ nem sempre explica o que a empresa realmente vende. Escreva, em linguagem simples, qual oferta deve guiar a busca por concorrentes.</p>
               {unidade && (
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Descrição opcional do ramo de atividade</label>
-                  <p className="mt-1 text-sm text-slate-500">Use este campo se o CNAE for genérico ou não explicar bem o que a empresa vende. Exemplo: “curso presencial de robótica e programação para crianças”. A descrição será usada para melhorar a busca de concorrentes no Google Places.</p>
+                  <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atividade analisado <span className="text-orange-600">(obrigatório)</span></label>
+                  <p className="mt-1 text-sm text-slate-500">Seja específico sobre a oferta, o público e o contexto. Exemplo: “curso presencial de robótica e programação para crianças e adolescentes”. A análise respeita este texto como escopo principal.</p>
                   <textarea
                     id="business-activity-description"
                     value={businessActivityDescription}
@@ -428,30 +403,30 @@ export function MarketIntelligenceApp() {
                     className="mt-3 min-h-28 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                    <span>Opcional. Se preenchido, será combinado com os CNAEs na busca de concorrentes.</span>
+                    <span>Este texto define quais concorrentes fazem sentido para a análise.</span>
                     <span>{businessActivityDescription.length}/300</span>
                   </div>
                 </div>
               )}
+              {!unidade && <p className="mt-4 text-sm text-slate-500">Carregue os dados da empresa pelo CNPJ para continuar.</p>}
             </Card>
 
             <Card>
               <Badge className="bg-slate-100 text-slate-600">3 — Tipos de concorrentes</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Tipos de concorrentes sugeridos pelo CNAE</h2>
+              <h2 className="mt-4 text-xl font-bold text-slate-900">Tipos de concorrentes que devem entrar na busca</h2>
               <p className="mt-2 text-sm text-slate-500">
-                A ferramenta usa os CNAEs selecionados para destacar categorias mais prováveis para este segmento. Mantenha <strong>Todos</strong> marcado para uma primeira análise ampla, ou escolha categorias específicas para reduzir o foco.
+                A ferramenta usa o ramo informado para destacar categorias prováveis. Mantenha <strong>Todos</strong> marcado para uma primeira análise ampla, ou escolha categorias específicas para reduzir o foco.
               </p>
               {unidade ? (
                 <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm text-blue-900">
-                  Sugestões baseadas em: {selectedCnaes.length ? selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : businessActivityDescription.trim() ? 'descrição informada pelo usuário' : unidade.cnaePrincipalDescricao}
-                  {businessActivityDescription.trim() ? ` · descrição informada: ${businessActivityDescription.trim()}` : ''}.
+                  Sugestões baseadas no ramo informado: {businessActivityDescription.trim() || 'descreva o ramo na etapa anterior para receber sugestões melhores'}.
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-slate-500">Carregue o CNPJ para receber sugestões de concorrentes ligadas aos CNAEs da empresa.</p>
+                <p className="mt-4 text-sm text-slate-500">Carregue o CNPJ e descreva o ramo para receber sugestões de concorrentes.</p>
               )}
               {businessActivityDescription.trim() && (
                 <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                  Busca adicional ativada: a análise também vai procurar concorrentes, alternativas e locais relacionados a “{businessActivityDescription.trim()}”, além dos CNAEs selecionados.
+                  A análise vai procurar concorrentes, alternativas e locais relacionados a “{businessActivityDescription.trim()}”.
                 </div>
               )}
               <div className="mt-4 grid gap-2 md:grid-cols-2">
@@ -465,10 +440,27 @@ export function MarketIntelligenceApp() {
               <p className="mt-2 text-sm text-slate-500">
                 A planilha de CEPs é opcional. Se você não tiver uma lista de clientes, deixe essa parte em branco: a ferramenta ainda analisa a região em torno da empresa usando o raio informado.
               </p>
-              <div className="mt-5 max-w-xs">
-                <label className="text-sm font-semibold text-slate-700">Raio de análise em torno da empresa</label>
-                <Input type="number" min={1} max={50} value={analysisRadiusKm} onChange={(event) => setAnalysisRadiusKm(clampAnalysisRadius(Number(event.target.value || 8)))} onBlur={() => setAnalysisRadiusKm((current) => clampAnalysisRadius(current))} />
-                <p className="mt-1 text-xs text-slate-500">Padrão: 8 km. Limite: 1 a 50 km. Valores maiores são ajustados automaticamente para 50 km.</p>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-sm font-semibold text-slate-700" htmlFor="analysis-radius">Raio de análise em torno da empresa</label>
+                  <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{safeAnalysisRadiusKm} km</span>
+                </div>
+                <input
+                  id="analysis-radius"
+                  type="range"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={safeAnalysisRadiusKm}
+                  onChange={(event) => setAnalysisRadiusKm(clampAnalysisRadius(Number(event.target.value)))}
+                  className="mt-4 w-full accent-orange-500"
+                />
+                <div className="mt-2 flex justify-between text-xs text-slate-500">
+                  <span>1 km</span>
+                  <span>4 km sugerido</span>
+                  <span>20 km máximo</span>
+                </div>
+                <p className="mt-3 text-xs text-slate-500">Use raios menores para análise de bairro e raios maiores quando o cliente aceita se deslocar mais ou quando o serviço tem alcance regional.</p>
               </div>
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                 <p><strong>Formato aceito:</strong> uma coluna chamada <code className="rounded bg-white px-1 py-0.5">cep</code>. O CEP pode estar como <code className="rounded bg-white px-1 py-0.5">22775003</code>, <code className="rounded bg-white px-1 py-0.5">22775-003</code> ou <code className="rounded bg-white px-1 py-0.5">22.775-003</code>; a ferramenta usa apenas os 8 números.</p>
@@ -494,11 +486,11 @@ export function MarketIntelligenceApp() {
                 <div>
                   <Badge className="bg-orange-100 text-orange-700">5 — Iniciar</Badge>
                   <h2 className="mt-3 text-2xl font-bold text-slate-900">Iniciar análise da região</h2>
-                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, os CNAEs selecionados, a descrição opcional do ramo, os tipos de concorrentes, o raio de {safeAnalysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
+                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, o ramo de atividade informado, os tipos de concorrentes, o raio de {safeAnalysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
                 </div>
                 <Button className="min-w-56" onClick={startAnalysis} disabled={!canAnalyze}>{loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />} Iniciar análise</Button>
               </div>
-              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, carregue os dados da empresa, selecione pelo menos um CNAE ou descreva o ramo de atividade, e mantenha pelo menos um tipo de concorrente selecionado.</p>}
+              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, carregue os dados da empresa, descreva o ramo de atividade e mantenha pelo menos um tipo de concorrente selecionado.</p>}
             </Card>
           </section>
         ) : (

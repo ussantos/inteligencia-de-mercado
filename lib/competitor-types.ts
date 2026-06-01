@@ -2,7 +2,7 @@
 // Cada tipo tambem tem termos de busca para ajudar o Google Places a encontrar resultados melhores.
 export const COMPETITOR_TYPES = [
   'Todos',
-  'Concorrentes diretos pelo CNAE',
+  'Concorrentes diretos do ramo informado',
   'Concorrentes locais similares',
   'Redes e franquias do setor',
   'Substitutos e alternativas de compra',
@@ -32,7 +32,7 @@ export interface CompetitorTypeConfig {
 
 export const COMPETITOR_TYPE_CONFIGS: CompetitorTypeConfig[] = [
   {
-    type: 'Concorrentes diretos pelo CNAE',
+    type: 'Concorrentes diretos do ramo informado',
     terms: ['concorrente', 'empresa', 'serviço', 'servico', 'loja', 'comércio', 'comercio', 'clínica', 'clinica', 'escritório', 'escritorio'],
     googleQueries: ['empresa do mesmo segmento', 'serviço do mesmo segmento', 'loja do mesmo segmento'],
     strategicCategoryHint: 'direto'

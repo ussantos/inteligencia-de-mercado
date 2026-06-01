@@ -28,15 +28,15 @@ Nao inclua dados sensiveis, listas completas de clientes, credenciais, tokens, c
 
 ## Proposito
 
-A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da empresa, identifica endereco e CNAEs, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
+A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da empresa para localizar endereco e CEP, usa o ramo de atividade descrito pelo usuario como escopo principal, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
 
 ## Funcionalidades
 
 - Consulta de empresa por CNPJ usando fontes publicas, com cache em Postgres.
-- Identificacao automatica de endereco, CEP e CNAEs.
-- Selecao de CNAEs e tipos de concorrentes/alternativas de mercado; a busca de concorrentes deve respeitar essas escolhas.
-- Descricao opcional do ramo de atividade para refinar a busca quando o CNAE for generico ou incompleto; quando preenchida, ela entra no escopo da analise e nas consultas ao Google Places.
-- Analise por raio em torno do empreendimento, com padrao de 8 km.
+- Identificacao automatica de endereco e CEP a partir do CNPJ.
+- Descricao obrigatoria do ramo de atividade para definir o escopo real da analise e das consultas ao Google Places.
+- Selecao de tipos de concorrentes/alternativas de mercado; a busca de concorrentes deve respeitar o ramo informado e essas escolhas.
+- Analise por raio em torno do empreendimento, com slider de 1 a 20 km e padrao de 4 km.
 - Upload opcional de CSV/XLSX com CEPs de clientes.
 - Exclusao do arquivo temporario do Azure Blob Storage depois que a analise termina com sucesso.
 - Modelo CSV baixavel para preencher CEPs antes do upload.
@@ -45,7 +45,8 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Distancia por linha reta e, quando configurado, rota com OpenRouteService.
 - Busca de concorrentes e locais relevantes via Google Places API.
 - Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras e locais relevantes.
-- Ranking de bairros/regioes, obstaculos de conversao, posicionamento e personas.
+- Ranking de bairros de clientes apenas quando uma planilha de CEPs e enviada; sem CEPs, o relatorio omite afinidade e bairros de clientes e mostra somente concorrentes, barreiras e oportunidades ao redor.
+- Obstaculos de conversao, posicionamento, personas e recomendacoes com explicacao de como interpretar cada secao.
 - Canvas Estrategico do Negocio gerado automaticamente a partir da analise, com proposta de valor, segmentos, canais, relacionamento, receitas, recursos, atividades, parcerias e custos.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, Canvas Estrategico, evolucao incremental e plano de acao.
 - Impressao da analise com layout especifico para PDF, em folha A4 retrato, com mapa esquematico, graficos, quebras de pagina controladas e secoes compactas para evitar cortes no meio do conteudo.
@@ -169,7 +170,7 @@ Opcionais:
 - `NOMINATIM_MONTHLY_BUDGET`
 - `OVERPASS_MONTHLY_BUDGET`
 
-Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes**, **Canvas Estrategico do Negocio** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas por bairro, concorrentes, CNAEs, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
+Quando `OPENAI_API_KEY` esta configurada, a aplicacao envia um resumo da analise para a IA e melhora as secoes **Recomendacoes Inteligentes**, **Canvas Estrategico do Negocio** e **Plano de Acao — Proximos Passos** com orientacoes mais especificas a partir do ramo informado, concorrentes, CEPs de clientes quando enviados, raio analisado e limitacoes encontradas. Sem essa chave, o relatorio continua funcionando com regras locais.
 
 Observacao sobre `AZURE_STORAGE_CONTAINER_NAME`: este valor deve ser o nome do container, por exemplo `uploads-temp`, nao o nome da storage account.
 
@@ -317,7 +318,7 @@ Configure:
 
 ### Fontes publicas de CNPJ e CEP
 
-Uso no projeto: dados cadastrais da empresa, endereco, CNAEs e normalizacao de CEPs.
+Uso no projeto: dados cadastrais da empresa, endereco, CEP da empresa e normalizacao de CEPs de clientes quando enviados.
 
 Leia principalmente:
 
@@ -396,7 +397,7 @@ https://places.googleapis.com/v1/places:searchText
 
 A chave deve ser server-side em `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`. A chave publica `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` serve para mapas no navegador e nao deve ser usada pelo backend para buscar concorrentes. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
 
-As consultas ao Google Places sao montadas a partir do escopo escolhido pelo usuario: CNAEs selecionados, descricao opcional do ramo de atividade e tipos de concorrentes. O CNAE principal cadastral do CNPJ e usado como fallback apenas quando o usuario nao escolhe CNAE nem descreve o ramo manualmente.
+As consultas ao Google Places sao montadas a partir do ramo de atividade descrito pelo usuario e dos tipos de concorrentes escolhidos. O CNPJ serve para localizar a empresa e obter o ponto central do raio; o CNAE cadastral nao define a busca de concorrentes.
 
 O Google Places nao retorna CNPJ diretamente. Para evitar listar a propria empresa como concorrente, a aplicacao cruza os resultados do Google com os dados do CNPJ analisado usando telefone, endereco, coordenadas, dominio do site/e-mail, similaridade de nome e, quando o site do resultado esta disponivel, busca o CNPJ da empresa na pagina retornada. Resultados identificados como a propria empresa sao removidos antes do relatorio.
 
@@ -581,15 +582,15 @@ Do not include sensitive data, complete customer lists, credentials, tokens, con
 
 ## Purpose
 
-The tool transforms public data and simple operational data into a practical market intelligence report. The analysis starts from the company's CNPJ, identifies address and CNAEs, compares the region with locations from Google Places, accepts an optional customer ZIP/postal code spreadsheet, and generates recommendations for marketing, sales, positioning, and local expansion.
+The tool transforms public data and simple operational data into a practical market intelligence report. The analysis starts from the company's CNPJ to locate address and ZIP/postal code, uses the business activity described by the user as the main scope, compares the region with locations from Google Places, accepts an optional customer ZIP/postal code spreadsheet, and generates recommendations for marketing, sales, positioning, and local expansion.
 
 ## Features
 
 - Company lookup by CNPJ using public sources, with PostgreSQL cache.
-- Automatic identification of address, ZIP/postal code, and CNAEs.
-- Selection of CNAEs and competitor or market alternative types; competitor searches should respect these user choices.
-- Optional business activity description to refine searches when CNAE data is generic or incomplete; when filled in, it becomes part of the analysis scope and Google Places queries.
-- Radius-based analysis around the business, with an 8 km default.
+- Automatic identification of address and ZIP/postal code from the CNPJ.
+- Required business activity description to define the real scope of the analysis and Google Places queries.
+- Selection of competitor or market alternative types; competitor searches should respect the described activity and these user choices.
+- Radius-based analysis around the business with a 1 to 20 km slider and a 4 km default.
 - Optional CSV/XLSX upload with customer ZIP/postal codes.
 - Deletion of the temporary Azure Blob Storage file after the analysis completes successfully.
 - Downloadable CSV template for ZIP/postal codes.
@@ -598,7 +599,8 @@ The tool transforms public data and simple operational data into a practical mar
 - Straight-line distance and, when configured, route distance with OpenRouteService.
 - Competitor and relevant-place search through Google Places API.
 - Google Maps view with layers for the company, customer ZIP/postal codes, competitors, barriers, and relevant places.
-- Neighborhood ranking, conversion barriers, positioning, and personas.
+- Customer neighborhood ranking only when a ZIP/postal code spreadsheet is uploaded; without ZIP/postal codes, the report omits customer affinity and customer neighborhoods and shows only nearby competitors, obstacles, and opportunities.
+- Conversion barriers, positioning, personas, and recommendations with explanations about how to interpret each section.
 - Automatically generated Strategic Business Canvas with value proposition, segments, channels, relationships, revenue, resources, activities, partnerships, and costs.
 - Optional OpenAI enrichment for smarter recommendations, positioning, Strategic Business Canvas, incremental evolution, and action planning.
 - Print-ready analysis layout for PDF, using A4 portrait pages, schematic map, charts, controlled page breaks, and compact sections to avoid splitting content in the middle.
@@ -720,7 +722,7 @@ Optional:
 - `NOMINATIM_MONTHLY_BUDGET`
 - `OVERPASS_MONTHLY_BUDGET`
 
-When `OPENAI_API_KEY` is configured, the application sends a summary of the analysis to AI and improves the **Smart Recommendations**, **Strategic Business Canvas**, and **Action Plan — Next Steps** sections with more specific guidance by neighborhood, competitors, CNAEs, analysis radius, and limitations found. Without this key, the report continues to work with local rules.
+When `OPENAI_API_KEY` is configured, the application sends a summary of the analysis to AI and improves the **Smart Recommendations**, **Strategic Business Canvas**, and **Action Plan — Next Steps** sections with more specific guidance based on the described business activity, competitors, customer ZIP/postal codes when uploaded, analysis radius, and limitations found. Without this key, the report continues to work with local rules.
 
 Note about `AZURE_STORAGE_CONTAINER_NAME`: this value must be the container name, for example `uploads-temp`, not the storage account name.
 
@@ -868,7 +870,7 @@ Configure:
 
 ### Public CNPJ and ZIP/Postal Code Sources
 
-Used for company registration data, address, CNAEs, and ZIP/postal code normalization.
+Used for company registration data, address, company ZIP/postal code, and customer ZIP/postal code normalization when uploaded.
 
 Read:
 
@@ -947,7 +949,7 @@ https://places.googleapis.com/v1/places:searchText
 
 The key must be server-side in `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`. The public `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` is only for browser maps and must not be used by the backend to search competitors. The API must be enabled in Google Cloud and billing must be active.
 
-Google Places queries are built from the scope selected by the user: selected CNAEs, optional business activity description, and competitor types. The company's main registered CNAE is used as a fallback only when the user does not select any CNAE and does not manually describe the activity.
+Google Places queries are built from the business activity described by the user and the selected competitor types. The CNPJ is used to locate the company and obtain the center point for the radius; the registered CNAE does not define competitor searches.
 
 Google Places does not return CNPJ directly. To avoid listing the analyzed company as its own competitor, the application cross-checks Google results against the CNPJ record using phone number, address, coordinates, website/email domain, name similarity, and, when the result website is available, scans the returned page for the company's CNPJ. Results identified as the same company are removed before the report is generated.
 

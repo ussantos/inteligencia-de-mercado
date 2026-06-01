@@ -1,5 +1,5 @@
 // Este arquivo e o "cerebro" da analise.
-// Ele junta CEPs, CNPJ, CNAEs, concorrentes, distancias e regras simples para montar o relatorio final.
+// Ele junta CEPs opcionais de clientes, CNPJ, ramo informado, concorrentes, distancias e regras simples para montar o relatorio final.
 // Pense nele como uma cozinha: recebe varios ingredientes e devolve um prato organizado.
 import { prisma } from '@/lib/prisma';
 import { normalizeCep, isValidCep } from '@/lib/cep';
@@ -35,41 +35,33 @@ function groupByNeighborhood(params: {
   unitLng: number;
   radiusKm: number;
 }): NeighborhoodScore[] {
-  // Aqui juntamos clientes e concorrentes por bairro.
-  // Depois damos uma nota para cada bairro, misturando distancia, concorrencia, polos e avaliacoes.
-  const keys = new Map<string, { bairro: string; cidade: string; points: CepPoint[]; places: StrategicPlace[] }>();
-  const defaultKey = `${params.unidade.bairro}||${params.unidade.municipio}`;
-  keys.set(defaultKey, { bairro: params.unidade.bairro, cidade: params.unidade.municipio, points: [], places: [] });
+  // Aqui agrupamos somente CEPs de clientes enviados pelo usuario.
+  // Concorrentes do Google nao entram nesta pontuacao, porque concorrencia nao e base de clientes.
+  if (!params.points.length) return [];
+
+  const keys = new Map<string, { bairro: string; cidade: string; points: CepPoint[] }>();
 
   for (const point of params.points) {
     const key = `${point.bairro}||${point.cidade}`;
-    const current = keys.get(key) || { bairro: point.bairro, cidade: point.cidade, points: [], places: [] };
+    const current = keys.get(key) || { bairro: point.bairro, cidade: point.cidade, points: [] };
     current.points.push(point);
     keys.set(key, current);
   }
 
-  for (const place of params.places) {
-    const neighborhood = placeNeighborhood(place, { bairro: params.unidade.bairro, cidade: params.unidade.municipio });
-    const key = `${neighborhood.bairro}||${neighborhood.cidade}`;
-    const current = keys.get(key) || { bairro: neighborhood.bairro, cidade: neighborhood.cidade, points: [], places: [] };
-    current.places.push(place);
-    keys.set(key, current);
-  }
-
   return [...keys.values()].map((group) => {
-    const direct = group.places.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
-    const indirect = group.places.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
-    const barriers = group.places.filter((place) => place.categoriaEstrategica === 'Barreira de acesso ou conveniência' || place.categoriaEstrategica === 'Barreira potencial de agenda').length;
-    const poles = group.places.filter((place) => place.categoriaEstrategica === 'Polo gerador de público').length;
-    const avgDistance = group.points.length
-      ? group.points.reduce((acc, p) => acc + p.distanciaLinhaRetaKm, 0) / group.points.length
-      : group.places.length
-        ? group.places.reduce((acc, p) => acc + (p.distanciaKm || params.radiusKm), 0) / group.places.length
-        : 0;
-    const ratingBoost = Math.min(8, group.places.reduce((acc, p) => acc + (p.rating || 0), 0) / Math.max(group.places.length, 1));
+    const nearbyPlaces = params.places.filter((place) => {
+      const neighborhood = placeNeighborhood(place, { bairro: params.unidade.bairro, cidade: params.unidade.municipio });
+      return neighborhood.bairro === group.bairro;
+    });
+    const direct = nearbyPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
+    const indirect = nearbyPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
+    const barriers = nearbyPlaces.filter((place) => place.categoriaEstrategica === 'Barreira de acesso ou conveniência' || place.categoriaEstrategica === 'Barreira potencial de agenda').length;
+    const poles = nearbyPlaces.filter((place) => place.categoriaEstrategica === 'Polo gerador de público').length;
+    const avgDistance = group.points.reduce((acc, p) => acc + p.distanciaLinhaRetaKm, 0) / group.points.length;
+    const ratingBoost = Math.min(8, nearbyPlaces.reduce((acc, p) => acc + (p.rating || 0), 0) / Math.max(nearbyPlaces.length, 1));
     const score = clamp(
       55 +
-        group.points.length * 6 +
+        group.points.length * 8 +
         Math.max(0, 20 - avgDistance * 1.4) +
         Math.max(0, 18 - direct * 4) +
         Math.max(0, 8 - indirect * 0.8) +
@@ -77,10 +69,6 @@ function groupByNeighborhood(params: {
         ratingBoost -
         barriers * 1.5
     );
-
-    const evidenceSource = group.points.length
-      ? `${group.points.length} CEP(s) de clientes atuais no bairro.`
-      : `Análise baseada no raio de ${params.radiusKm} km em torno da empresa, sem planilha de CEPs.`;
 
     return {
       bairro: group.bairro,
@@ -92,13 +80,13 @@ function groupByNeighborhood(params: {
       concorrentesIndiretos: indirect,
       polosFamiliares: poles,
       evidencias: [
-        evidenceSource,
-        `${direct} concorrente(s) direto(s) mapeado(s) no Google Places.`,
-        `${indirect} concorrente(s) indireto(s) mapeado(s).`,
-        `${barriers} possível(is) barreira(s) de acesso, conveniência ou decisão de compra.`
+        `${group.points.length} CEP(s) de clientes atuais enviados pelo usuário neste bairro.`,
+        `${direct} concorrente(s) direto(s) mapeado(s) no mesmo bairro pelo Google Places.`,
+        `${indirect} concorrente(s) indireto(s) mapeado(s) no mesmo bairro.`,
+        `${barriers} possível(is) barreira(s) de acesso, conveniência ou decisão de compra no bairro.`
       ],
       limitacoes: [
-        'O perfil financeiro por bairro é uma estimativa operacional, não um dado censitário individual.',
+        'Este ranking existe apenas porque houve CEPs de clientes enviados pelo usuário.',
         'As avaliações e locais vêm do Google Places e dependem da disponibilidade de dados do Google para a região.'
       ],
       acaoRecomendada: score >= 75
@@ -125,6 +113,51 @@ function buildDistribuicao(points: CepPoint[]) {
 function buildObstacles(scores: NeighborhoodScore[], places: StrategicPlace[], radiusKm: number): AnalysisResult['obstaculosMatricula'] {
   // Obstaculos sao coisas que podem dificultar a venda.
   // Exemplo: muitos concorrentes diretos, muita alternativa indireta ou distancia alta.
+  if (!scores.length) {
+    const direct = places.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia');
+    const indirect = places.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular');
+    const barriers = places.filter((place) => place.categoriaEstrategica === 'Barreira de acesso ou conveniência' || place.categoriaEstrategica === 'Barreira potencial de agenda');
+    const items: AnalysisResult['obstaculosMatricula'] = [];
+
+    if (direct.length) {
+      items.push({
+        bairro: 'Raio analisado',
+        tipoObstaculo: 'Concorrência direta no entorno',
+        descricao: `Foram encontrados concorrentes diretos dentro do raio de ${radiusKm} km. Como não há CEPs de clientes, isso deve ser lido como pressão competitiva regional, não como bairro de clientes.`,
+        evidencias: direct.slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
+        impactoEstimado: direct.length >= 8 ? 'Alto' : direct.length >= 3 ? 'Médio' : 'Baixo',
+        acaoRecomendada: 'Compare proposta, reputação, preço percebido, velocidade de resposta e prova social dos concorrentes antes de criar a mensagem comercial.',
+        deveSerTestadoAntes: true
+      });
+    }
+
+    if (indirect.length >= 3) {
+      items.push({
+        bairro: 'Raio analisado',
+        tipoObstaculo: 'Alternativas indiretas no entorno',
+        descricao: 'Há alternativas que podem disputar atenção, orçamento ou conveniência do mesmo público, ainda que não sejam concorrentes diretos.',
+        evidencias: indirect.slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
+        impactoEstimado: 'Médio',
+        acaoRecomendada: 'Explique por que a empresa resolve melhor o problema do cliente do que alternativas indiretas, usando exemplos concretos e linguagem simples.',
+        deveSerTestadoAntes: true
+      });
+    }
+
+    if (barriers.length) {
+      items.push({
+        bairro: 'Raio analisado',
+        tipoObstaculo: 'Barreiras de acesso ou conveniência',
+        descricao: 'Foram encontrados fatores regionais que podem interferir na decisão de compra, como acesso, conveniência, fluxo ou comparação com polos próximos.',
+        evidencias: barriers.slice(0, 5).map((place) => `${place.nome}${place.rating ? ` — ${place.rating.toFixed(1)}★` : ''}`),
+        impactoEstimado: barriers.length >= 4 ? 'Médio' : 'Baixo',
+        acaoRecomendada: 'Valide no atendimento quais barreiras aparecem de verdade: distância, agenda, estacionamento, preço, confiança ou prazo.',
+        deveSerTestadoAntes: true
+      });
+    }
+
+    return items;
+  }
+
   return scores.slice(0, 8).flatMap((score) => {
     const relatedPlaces = places.filter((place) => (place.bairro || score.bairro) === score.bairro || !place.bairro);
     const direct = score.concorrentesDiretos;
@@ -263,6 +296,7 @@ function buildSmartRecommendations(input: {
   strategicPlaces: StrategicPlace[];
   directCount: number;
   analysisRadiusKm: number;
+  hasCustomerCepData: boolean;
 }) {
   // Este resumo e propositalmente curto.
   // Ele transforma os dados em decisao pratica, sem criar mais uma lista de tarefas para a pessoa.
@@ -274,7 +308,9 @@ function buildSmartRecommendations(input: {
     : 'os concorrentes locais ainda precisam ser validados manualmente';
 
   return {
-    prioridadePrincipal: `Concentre a primeira rodada comercial em ${input.topBairro}, usando uma oferta clara e fácil de comparar.`,
+    prioridadePrincipal: input.hasCustomerCepData
+      ? `Concentre a primeira rodada comercial em ${input.topBairro}, usando uma oferta clara e fácil de comparar.`
+      : `Concentre a primeira rodada no raio de ${input.analysisRadiusKm} km ao redor da empresa, sem assumir bairros de clientes até haver CEPs ou leads reais.`,
     brechaCompetitiva: input.directCount > 0
       ? `Use conveniência, atendimento rápido e prova social local para competir contra ${competitorHint}.`
       : `A baixa presença de concorrentes diretos no raio de ${input.analysisRadiusKm} km sugere espaço para testar presença local antes de ampliar investimento.`,
@@ -307,6 +343,7 @@ function buildBusinessModelCanvas(input: {
   neighborhoodScores: NeighborhoodScore[];
   directCount: number;
   competitorTypes: CompetitorType[];
+  hasCustomerCepData: boolean;
 }): BusinessModelCanvas {
   // O Canvas resume o modelo de negocio sugerido pela analise.
   // Ele nao pede trabalho extra ao usuario: transforma os dados ja coletados em uma visao executiva.
@@ -329,15 +366,15 @@ function buildBusinessModelCanvas(input: {
         : `Presença local em um raio de ${input.analysisRadiusKm} km onde a baixa concorrência direta pode permitir validação rápida.`
     ]),
     segmentosDeClientes: uniqueFilled([
-      `Clientes e decisores próximos de ${input.topBairro}.`,
-      ...topNeighborhoods.map((bairro) => `Público com afinidade operacional em ${bairro}.`),
+      input.hasCustomerCepData ? `Clientes e decisores próximos de ${input.topBairro}.` : `Clientes potenciais no raio de ${input.analysisRadiusKm} km ao redor da empresa.`,
+      ...(input.hasCustomerCepData ? topNeighborhoods.map((bairro) => `Público com afinidade operacional em ${bairro}.`) : []),
       'Compradores que pesquisam no Google antes de entrar em contato.',
       'Clientes com urgência que valorizam resposta rápida, prazo claro e baixo atrito.'
     ]),
     canais: uniqueFilled([
       'Google Maps e busca orgânica local.',
       'WhatsApp ou canal direto de atendimento.',
-      'Campanhas por raio nos bairros com maior afinidade.',
+      input.hasCustomerCepData ? 'Campanhas por raio nos bairros com maior afinidade.' : `Campanhas por raio de ${input.analysisRadiusKm} km até formar base real de CEPs/leads.`,
       partnerPlaces.length ? 'Parcerias e indicações com locais complementares mapeados.' : 'Indicações locais e prova social em canais digitais.'
     ]),
     relacionamentoComClientes: uniqueFilled([
@@ -383,7 +420,6 @@ export async function runMarketAnalysis(input: {
   userId: string;
   unidade: UnidadeNegocio;
   ceps?: string[];
-  selectedCnaes?: CnaeOption[];
   businessActivityDescription?: string;
   competitorTypes?: CompetitorType[];
   analysisRadiusKm?: number;
@@ -393,19 +429,12 @@ export async function runMarketAnalysis(input: {
   const rawCeps = Array.isArray(input.ceps) ? input.ceps : [];
   const validCeps = [...new Set(rawCeps.map(normalizeCep).filter(isValidCep))];
   const invalidCeps = rawCeps.map(String).filter((cep) => cep.trim() && !isValidCep(cep));
-  const analysisRadiusKm = Math.max(1, Math.min(50, Number(input.analysisRadiusKm || 8)));
+  const analysisRadiusKm = Math.max(1, Math.min(20, Number(input.analysisRadiusKm || 4)));
   const businessActivityDescription = String(input.businessActivityDescription || '').trim().slice(0, 300);
-  const submittedCnaes = Array.isArray(input.selectedCnaes) ? input.selectedCnaes : [];
-  const selectedCnaes = submittedCnaes.length
-    ? submittedCnaes
-    : businessActivityDescription
-      ? []
-      : input.unidade.cnaes.slice(0, 1);
+  if (businessActivityDescription.length < 3) throw new Error('Descreva o ramo de atividade antes de iniciar a análise.');
+  const selectedCnaes: CnaeOption[] = [];
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
-  const domain = [
-    businessActivityDescription ? `Descrição informada: ${businessActivityDescription}` : '',
-    selectedCnaes.map((cnae) => `${cnae.codigo ? `${cnae.codigo} — ` : ''}${cnae.descricao}`).join(' | ')
-  ].filter(Boolean).join(' | ');
+  const domain = `Ramo informado: ${businessActivityDescription}`;
 
   const unitGeo = await geocodeCep(input.unidade.cep);
   if (!unitGeo) throw new Error('Não foi possível geocodificar o CEP da empresa obtido pelo CNPJ.');
@@ -436,26 +465,24 @@ export async function runMarketAnalysis(input: {
     center: { lat: unitGeo.lat, lng: unitGeo.lng, cep: unitGeo.cep },
     unidade: input.unidade,
     competitorTypes,
-    selectedCnaes,
     businessActivityDescription,
     radiusKm: analysisRadiusKm
   });
   const strategicPlaces = strategicPlacesResult.places;
   const neighborhoodScores = groupByNeighborhood({ points, places: strategicPlaces, unidade: input.unidade, unitLat: unitGeo.lat, unitLng: unitGeo.lng, radiusKm: analysisRadiusKm });
+  const hasCustomerCepData = points.length > 0;
   const distances = points.map((p) => p.distanciaLinhaRetaKm);
   const directCount = strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente direto' || p.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
   const indirectCount = strategicPlaces.filter((p) => p.categoriaEstrategica === 'Concorrente indireto' || p.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
-  const opportunity = clamp(70 + (points.length ? points.length * 2 : 4) - directCount * 4 - indirectCount * 0.7 + (neighborhoodScores[0]?.score || 0) / 4);
+  const opportunity = clamp(68 + (hasCustomerCepData ? Math.min(20, points.length * 1.5) : 0) - directCount * 3.5 - indirectCount * 0.7 + (neighborhoodScores[0]?.score || 0) / 4);
   const fase = directCount <= 2 ? 'Mercado com Lacuna' : directCount <= 8 ? 'Mercado em Crescimento' : directCount <= 18 ? 'Mercado Maduro' : 'Mercado Saturado';
 
-  const topBairros = neighborhoodScores.slice(0, 5).map((item) => ({ bairro: item.bairro, cidade: item.cidade, total: item.cepCount || item.concorrentesDiretos + item.concorrentesIndiretos }));
+  const topBairros = neighborhoodScores.slice(0, 5).map((item) => ({ bairro: item.bairro, cidade: item.cidade, total: item.cepCount }));
   const today = new Date();
   const reviewDays = fase === 'Mercado com Lacuna' ? 30 : fase === 'Mercado em Crescimento' ? 60 : fase === 'Mercado Maduro' ? 90 : 45;
   const unitName = input.unidade.nomeFantasia || input.unidade.razaoSocial;
   const topBairro = neighborhoodScores[0]?.bairro || input.unidade.bairro;
-  const analysisSegment = businessActivityDescription
-    || selectedCnaes.map((cnae) => cnae.descricao).filter(Boolean).join(', ')
-    || input.unidade.cnaePrincipalDescricao;
+  const analysisSegment = businessActivityDescription;
   const hasGoogleKey = Boolean(process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY);
 
   const result: AnalysisResult = {
@@ -472,7 +499,9 @@ export async function runMarketAnalysis(input: {
     strategicPlaces,
     faseMercadoLocal: {
       fase: fase as any,
-      justificativa: `Classificação baseada na região de atuação de ${analysisRadiusKm} km ao redor da empresa, ${points.length} CEP(s) de clientes enviados, ${directCount} concorrente(s) direto(s) e ${indirectCount} concorrente(s) indireto(s) mapeados via Google Places.`,
+      justificativa: hasCustomerCepData
+        ? `Classificação baseada no ramo informado, no raio de ${analysisRadiusKm} km ao redor da empresa, em ${points.length} CEP(s) de clientes enviados e em ${directCount} concorrente(s) direto(s) e ${indirectCount} concorrente(s) indireto(s) mapeados via Google Places.`
+        : `Classificação baseada no ramo informado, no raio de ${analysisRadiusKm} km ao redor da empresa e em ${directCount} concorrente(s) direto(s) e ${indirectCount} concorrente(s) indireto(s) mapeados via Google Places. Nenhuma seção de afinidade de clientes foi gerada porque não houve upload de CEPs de clientes.`,
       cor: fase === 'Mercado Saturado' ? 'vermelho' : fase === 'Mercado Maduro' ? 'laranja' : fase === 'Mercado em Crescimento' ? 'amarelo' : 'verde'
     },
     estatisticas: {
@@ -490,7 +519,7 @@ export async function runMarketAnalysis(input: {
     obstaculosMatricula: buildObstacles(neighborhoodScores, strategicPlaces, analysisRadiusKm),
     posicionamentoUnidade: {
       forcasAtuais: [
-        `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com escopo de análise definido por ${selectedCnaes.length ? `CNAE(s) selecionado(s): ${selectedCnaes.map((cnae) => cnae.descricao).join(', ')}` : `descrição informada pelo usuário: ${businessActivityDescription}`}.`,
+        `${unitName} atua no contexto de ${input.unidade.bairro}, ${input.unidade.municipio}/${input.unidade.uf}, com escopo definido pelo ramo informado: ${businessActivityDescription}.`,
         'A análise considera a região real da empresa detectada pelo CNPJ, e não um território genérico.',
         'Atendimento consultivo, prova social, clareza de oferta e conveniência local são ativos importantes para conversão.'
       ],
@@ -510,12 +539,12 @@ export async function runMarketAnalysis(input: {
         'Mostre diferenciais concretos antes de pedir a decisão de compra.'
       ],
       ajustesIncrementaisSugeridos: [
-        `Testar campanha local em ${topBairro} e bairros próximos antes de ampliar verba.`,
-        'Registrar objeções por bairro: distância, agenda, preço e comparação com concorrentes.',
+        hasCustomerCepData ? `Testar campanha local em ${topBairro} e bairros próximos antes de ampliar verba.` : `Testar uma campanha por raio de ${analysisRadiusKm} km antes de segmentar bairros específicos.`,
+        hasCustomerCepData ? 'Registrar objeções por bairro: distância, agenda, preço e comparação com concorrentes.' : 'Registrar objeções por origem do lead: distância, agenda, preço e comparação com concorrentes.',
         'Criar respostas comerciais citando diferenciais frente aos tipos de concorrentes selecionados.'
       ],
       hipotesesParaTestar: [
-        `Bairros com maior score no raio de ${analysisRadiusKm} km tendem a gerar mais leads qualificados.`,
+        hasCustomerCepData ? `Bairros com maior score no raio de ${analysisRadiusKm} km tendem a gerar mais leads qualificados.` : `O raio de ${analysisRadiusKm} km pode gerar demanda qualificada se a oferta deixar claro por que é melhor que os concorrentes próximos.`,
         'Mensagens com prova social e benefício concreto convertem melhor que mensagens genéricas.',
         'Clientes avançam mais rápido quando recebem preço, prazo e diferenciais de forma objetiva.'
       ]
@@ -523,9 +552,9 @@ export async function runMarketAnalysis(input: {
     personas: buildPersonas(input.unidade, topBairro, analysisSegment),
     evolucaoIncremental: {
       manter: ['WhatsApp ou canal direto como principal ponto de conversão.', 'Atendimento consultivo como porta de entrada.', 'Comunicação centrada no problema que o negócio resolve.'],
-      melhorar: [`Segmentação por bairros dentro do raio de ${analysisRadiusKm} km.`, 'Scripts de objeção por perfil de cliente, bairro e tipo de concorrente.', 'Mensuração de leads por origem geográfica e por concorrente citado.'],
-      adicionar: ['Ranking de bairros prioritários para campanhas locais.', 'Lista de concorrentes com avaliação Google para comparação comercial.', 'Campo de objeções no follow-up para validar barreiras regionais.'],
-      testarAntesDeAlterar: ['Campanhas por raio nos bairros com maior afinidade.', 'Mensagens específicas por intenção de compra e nível de urgência.', 'Ofertas pontuais para bairros com maior distância da empresa.'],
+      melhorar: [hasCustomerCepData ? `Segmentação por bairros com clientes dentro do raio de ${analysisRadiusKm} km.` : `Segmentação inicial por raio de ${analysisRadiusKm} km, sem assumir bairros de clientes.`, 'Scripts de objeção por perfil de cliente, origem do lead e tipo de concorrente citado.', 'Mensuração de leads por origem geográfica e por concorrente citado.'],
+      adicionar: [hasCustomerCepData ? 'Ranking de bairros prioritários para campanhas locais.' : 'Registro de CEP ou bairro dos novos leads para criar base real de clientes futuros.', 'Lista de concorrentes com avaliação Google para comparação comercial.', 'Campo de objeções no follow-up para validar barreiras regionais.'],
+      testarAntesDeAlterar: [hasCustomerCepData ? 'Campanhas por raio nos bairros com maior afinidade.' : 'Campanhas por raio amplo antes de escolher bairros prioritários.', 'Mensagens específicas por intenção de compra e nível de urgência.', 'Ofertas pontuais para testar resposta antes de alterar preço ou operação.'],
       fazerSemPrejudicarOperacao: ['Usar os dados como camada de decisão semanal, sem trocar a operação comercial atual.', 'Aplicar testes pequenos antes de mudar investimento, preços ou formato de oferta.']
     },
     diagnosticoFontesPublicas: [
@@ -537,20 +566,33 @@ export async function runMarketAnalysis(input: {
       'PNAD Contínua é amostral e normalmente não oferece granularidade por bairro/CEP.',
       'Censo 2022 pode enriquecer a análise, mas exige ETL com setor censitário, malha territorial e cruzamento geográfico.'
     ],
-    recomendacoesInteligentes: buildSmartRecommendations({ unitName, topBairro, strategicPlaces, directCount, analysisRadiusKm }),
-    businessModelCanvas: buildBusinessModelCanvas({ unitName, analysisSegment, topBairro, analysisRadiusKm, strategicPlaces, neighborhoodScores, directCount, competitorTypes }),
+    recomendacoesInteligentes: buildSmartRecommendations({ unitName, topBairro, strategicPlaces, directCount, analysisRadiusKm, hasCustomerCepData }),
+    businessModelCanvas: buildBusinessModelCanvas({ unitName, analysisSegment, topBairro, analysisRadiusKm, strategicPlaces, neighborhoodScores, directCount, competitorTypes, hasCustomerCepData }),
     planoDeAcao: [
-      { prioridade: 1, acao: `Priorizar os bairros com maior afinidade dentro de ${analysisRadiusKm} km para campanhas e follow-up ativo.`, tipo: 'Testar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '7 a 14 dias', custoEstimado: 'Baixo', recursoGratuitoConfirmado: false, responsavelSugerido: 'Comercial/Marketing', kpiParaMedirSucesso: 'Leads qualificados por bairro' },
-      { prioridade: 2, acao: 'Criar argumento comercial comparando a empresa com os concorrentes diretos mais bem avaliados no Google.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },
-      { prioridade: 3, acao: 'Registrar no atendimento quais alternativas o cliente está comparando e qual objeção pesa mais.', tipo: 'Adicionar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Atendimento', kpiParaMedirSucesso: 'Objeções registradas por lead e bairro' },
-      { prioridade: 4, acao: 'Criar mensagens diferentes para urgência, comparação de preço, busca por qualidade e conveniência local.', tipo: 'Melhorar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '2 semanas', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing', kpiParaMedirSucesso: 'CTR e taxa de resposta por segmento de mensagem' }
+      {
+        prioridade: 1,
+        acao: hasCustomerCepData
+          ? `Priorizar ${topBairro} e os demais bairros com CEPs reais de clientes: criar uma campanha pequena por raio, registrar origem do lead e comparar taxa de resposta antes de ampliar verba.`
+          : `Validar demanda no raio de ${analysisRadiusKm} km sem assumir bairros de clientes: criar campanha pequena por raio, registrar CEP/bairro dos leads recebidos e revisar em 7 dias quais regiões responderam melhor.`,
+        tipo: 'Testar',
+        impactoEsperado: 'Alto',
+        facilidadeExecucao: 'Alta',
+        prazoSugerido: '7 a 14 dias',
+        custoEstimado: 'Baixo',
+        recursoGratuitoConfirmado: false,
+        responsavelSugerido: 'Comercial/Marketing',
+        kpiParaMedirSucesso: hasCustomerCepData ? 'Leads qualificados por bairro' : 'Leads qualificados por raio, bairro informado e custo por lead'
+      },
+      { prioridade: 2, acao: 'Criar uma matriz simples de comparação com os 5 concorrentes diretos mais fortes: anotar avaliação Google, distância, promessa principal, preço quando público, canal de contato e diferencial percebido; usar essa matriz para escrever respostas comerciais.', tipo: 'Melhorar', impactoEsperado: 'Alto', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing/Atendimento', kpiParaMedirSucesso: 'Taxa de avanço do primeiro contato para orçamento ou visita' },
+      { prioridade: 3, acao: 'Registrar no atendimento, em uma planilha ou CRM simples, qual concorrente ou alternativa o cliente citou, qual objeção apareceu primeiro e qual resposta ajudou a avançar; revisar os registros semanalmente para ajustar a mensagem.', tipo: 'Adicionar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '1 semana', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Atendimento', kpiParaMedirSucesso: 'Objeções registradas por lead e taxa de avanço por objeção' },
+      { prioridade: 4, acao: 'Criar quatro versões de mensagem: urgência, comparação de preço, busca por qualidade e conveniência local; testar cada uma por uma semana em WhatsApp, anúncio local ou resposta padrão e manter apenas as que gerarem mais retorno qualificado.', tipo: 'Melhorar', impactoEsperado: 'Médio', facilidadeExecucao: 'Alta', prazoSugerido: '2 semanas', custoEstimado: 'Gratuito', recursoGratuitoConfirmado: true, responsavelSugerido: 'Marketing', kpiParaMedirSucesso: 'CTR, taxa de resposta e taxa de avanço por segmento de mensagem' }
     ],
     proximaRevisaoRecomendada: new Date(today.getTime() + reviewDays * 24 * 60 * 60 * 1000).toISOString(),
     iaAviso: process.env.OPENAI_API_KEY ? undefined : 'A análise com IA avançada não foi executada porque a chave OpenAI não está configurada. O relatório usa regras locais, Google Places e dados públicos disponíveis.'
   };
   const aiEnhancement = await enhanceWithOpenAI(result);
   const finalResult: AnalysisResult = aiEnhancement
-    ? { ...result, ...aiEnhancement, posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || result.posicionamentoUnidade, iaAviso: 'Plano de ação e recomendações enriquecidos com IA a partir dos dados públicos, concorrentes, bairros, CNAEs e limitações encontradas.' }
+    ? { ...result, ...aiEnhancement, posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || result.posicionamentoUnidade, iaAviso: 'Plano de ação e recomendações enriquecidos com IA a partir do ramo informado, dados públicos, concorrentes, CEPs de clientes quando enviados e limitações encontradas.' }
     : result;
 
   const saved = await prisma.analysis.create({

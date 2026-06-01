@@ -8,6 +8,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveCo
 import { Badge, Card } from '@/components/ui';
 import { PrintableReport } from '@/components/PrintableReport';
 import type { AnalysisResult, BusinessModelCanvas } from '@/lib/types';
+import type { ReactNode } from 'react';
 import { formatKm } from '@/lib/utils';
 
 const MarketMap = dynamic(
@@ -78,12 +79,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
   const direct = result.strategicPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente direto' || place.categoriaEstrategica === 'Concorrente direto de tecnologia').length;
   const indirect = result.strategicPlaces.filter((place) => place.categoriaEstrategica === 'Concorrente indireto' || place.categoriaEstrategica === 'Concorrente indireto extracurricular').length;
   const position = result.posicionamentoUnidade;
-  const analysisScope = [
-    result.selectedCnaes.length ? result.selectedCnaes.map((cnae) => cnae.descricao).join(' · ') : '',
-    result.businessActivityDescription ? `Descrição: ${result.businessActivityDescription}` : ''
-  ].filter(Boolean).join(' · ') || 'Escopo não informado';
+  const analysisScope = result.businessActivityDescription ? `Ramo informado: ${result.businessActivityDescription}` : 'Ramo não informado no relatório antigo';
   const smartRecommendations = result.recomendacoesInteligentes || {
-    prioridadePrincipal: 'Priorize os bairros com maior afinidade e valide a resposta comercial antes de ampliar investimento.',
+    prioridadePrincipal: result.points.length ? 'Priorize os bairros com clientes reais e valide a resposta comercial antes de ampliar investimento.' : 'Valide a demanda no raio analisado antes de assumir quais bairros concentram clientes.',
     brechaCompetitiva: 'Use conveniência, clareza de oferta e prova social local para se diferenciar de alternativas próximas.',
     personaFoco: 'Foque decisores que precisam de confiança, resposta rápida e comparação simples entre opções.',
     objecaoProvavel: 'A objeção mais provável é comparação de preço, reputação ou conveniência.',
@@ -91,6 +89,8 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
     mensagemPronta: `Olá! A ${unitName} atende sua região com orientação clara e resposta rápida. Posso te mostrar a melhor opção para o que você precisa hoje?`
   };
   const businessModelCanvas = normalizeBusinessModelCanvas(result);
+  const hasCustomerCepData = result.points.length > 0;
+  const visibleSections = sections.filter(([id]) => hasCustomerCepData || !['distancias', 'economico', 'afinidade'].includes(id));
 
   return (
     <div className="report-shell grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -98,7 +98,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         <Card className="sticky top-24">
           <h2 className="font-bold text-slate-900">Navegação da Análise</h2>
           <nav className="mt-4 space-y-1">
-            {sections.map(([id, label]) => (
+            {visibleSections.map(([id, label]) => (
               <a key={id} href={`#${id}`} className="block rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900">
                 {label}
               </a>
@@ -122,6 +122,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
             <p className="mt-2 text-sm text-slate-500">
               <strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}
             </p>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> esta é a leitura executiva do mercado local. Ela considera o ramo informado, o raio escolhido e os concorrentes encontrados. {hasCustomerCepData ? 'Como houve CEPs de clientes, as seções de bairros mostram onde a base atual aparece.' : 'Como não houve CEPs de clientes, o relatório não tenta dizer onde os clientes moram; ele foca nos concorrentes ao redor e em como validar demanda.'}
+            </SectionGuide>
             {result.iaAviso && <p className="mt-4 rounded-2xl bg-blue-50 p-3 text-sm text-blue-800">{result.iaAviso}</p>}
           </Card>
         </section>
@@ -129,9 +132,12 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         <section id="contexto">
           <Card>
             <h2 className="text-2xl font-bold text-slate-900">Contexto da Região</h2>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> use estes indicadores para entender o tamanho da amostra e a pressão competitiva. CEPs de clientes só aparecem quando você enviou uma planilha; concorrentes vêm do Google Places dentro do raio escolhido.
+            </SectionGuide>
             <div className="mt-4 grid gap-4 md:grid-cols-5">
               <Metric label="CEPs de clientes" value={result.estatisticas.totalValidos} />
-              <Metric label="Bairros/regiões" value={result.estatisticas.topBairros.length} />
+              {hasCustomerCepData && <Metric label="Bairros de clientes" value={result.estatisticas.topBairros.length} />}
               <Metric label="Concorrentes diretos" value={direct} />
               <Metric label="Concorrentes indiretos" value={indirect} />
               <Metric label="Índice de oportunidade" value={`${result.estatisticas.indiceOportunidadeMercado}/100`} />
@@ -146,6 +152,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
               <h2 className="text-2xl font-bold text-slate-900">Recomendações Inteligentes</h2>
             </div>
             <p className="mt-2 text-sm text-slate-500">Síntese para decidir rápido: prioridade, brecha competitiva, persona foco, objeção provável e uma mensagem pronta para usar.</p>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> esta seção transforma o diagnóstico em orientação comercial. Leia primeiro a prioridade, depois use a brecha competitiva para ajustar discurso, atendimento e anúncio. A mensagem pronta é um ponto de partida para WhatsApp, anúncio local ou resposta de atendimento.
+            </SectionGuide>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <SmartCard title="Prioridade principal" text={smartRecommendations.prioridadePrincipal} />
               <SmartCard title="Brecha competitiva" text={smartRecommendations.brechaCompetitiva} />
@@ -169,6 +178,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
             <p className="mt-2 text-sm text-slate-500">
               Mapa Google Maps para visualizar a empresa, CEPs informados, locais relevantes, barreiras e concorrentes encontrados. As avaliações e locais continuam vindo do Google Places quando a chave do servidor está configurada.
             </p>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> a empresa é o ponto de referência. Marcadores de concorrentes mostram pressão competitiva; marcadores de CEPs aparecem apenas quando você enviou clientes. Use o mapa para identificar proximidade, clusters e possíveis lacunas de cobertura.
+            </SectionGuide>
             <div className="mt-5">
               <MarketMap result={result} />
             </div>
@@ -179,31 +191,37 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
           <StatsPanel result={result} />
         </section>
 
-        <section id="distancias">
-          <Card>
-            <h2 className="text-2xl font-bold text-slate-900">Análise de Distâncias</h2>
-            {result.points.length ? (
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Metric label="Distância média dos clientes" value={formatKm(result.estatisticas.distanciaMediaKm)} />
-                <Metric label="Distância mediana dos clientes" value={formatKm(result.estatisticas.distanciaMedianaKm)} />
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-600">Nenhuma planilha de CEPs foi enviada. A análise usa o raio de atuação em torno da empresa e os locais encontrados no Google Places.</p>
-            )}
-          </Card>
-        </section>
+        {hasCustomerCepData && (
+          <>
+            <section id="distancias">
+              <Card>
+                <h2 className="text-2xl font-bold text-slate-900">Análise de Distâncias dos Clientes</h2>
+                <SectionGuide>
+                  <strong>Como interpretar:</strong> esta seção usa apenas CEPs enviados pelo usuário. Ela ajuda a entender se os clientes atuais estão perto da empresa ou se já aceitam deslocamento maior.
+                </SectionGuide>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <Metric label="Distância média dos clientes" value={formatKm(result.estatisticas.distanciaMediaKm)} />
+                  <Metric label="Distância mediana dos clientes" value={formatKm(result.estatisticas.distanciaMedianaKm)} />
+                </div>
+              </Card>
+            </section>
 
-        <section id="economico">
-          <Ranking title="Perfil Econômico e Financeiro" items={result.perfilEconomico} />
-        </section>
+            <section id="economico">
+              <Ranking title="Leitura operacional dos bairros com clientes" items={result.perfilEconomico} />
+            </section>
 
-        <section id="afinidade">
-          <Ranking title="Índice de Afinidade por Bairro" items={result.afinidadePorBairro} />
-        </section>
+            <section id="afinidade">
+              <Ranking title="Índice de Afinidade por Bairro de Cliente" items={result.afinidadePorBairro} />
+            </section>
+          </>
+        )}
 
         <section id="obstaculos">
           <Card>
             <h2 className="text-2xl font-bold text-slate-900">Obstáculos que podem atrapalhar a conversão</h2>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> obstáculos são fatores que podem reduzir conversão. Eles não dizem que a venda é impossível; indicam o que precisa ser respondido no atendimento, na oferta ou na comunicação.
+            </SectionGuide>
             <div className="mt-5 grid gap-4">
               {result.obstaculosMatricula.length ? (
                 result.obstaculosMatricula.map((item, index) => (
@@ -236,6 +254,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         <section id="concorrentes">
           <Card>
             <h2 className="text-2xl font-bold text-slate-900">Concorrentes e locais relevantes</h2>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> esta lista mostra os locais encontrados no raio e no ramo informado. Use avaliação, distância e categoria para decidir contra quem comparar a oferta e quais diferenciais precisam ficar explícitos.
+            </SectionGuide>
             {result.strategicPlaces.length === 0 ? (
               <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-700">
                 <p className="font-semibold text-slate-900">Nenhum concorrente ou local relevante foi encontrado.</p>
@@ -267,6 +288,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         <section id="posicionamento">
           <Card>
             <h2 className="text-2xl font-bold text-slate-900">Como {unitName} está posicionada</h2>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> esta seção traduz concorrência e contexto regional em discurso comercial. Use as forças para comunicação, os riscos para preparar objeções e o SWOT para priorizar o que testar primeiro.
+            </SectionGuide>
             {position && <GridLists data={position as unknown as Record<string, string[]>} />}
             <SwotMatrix result={result} />
           </Card>
@@ -281,6 +305,9 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
             <p className="mt-2 text-sm text-slate-500">
               Síntese automática do modelo de negócio sugerido pela análise. Ela cruza escopo informado, região, concorrentes, canais, parcerias e próximos passos sem exigir que o usuário preencha um Canvas manualmente.
             </p>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> o Canvas resume como o negócio pode operar melhor no contexto analisado. Ele não é uma nova tarefa; é uma visão organizada de proposta de valor, clientes, canais, parcerias e custos para orientar decisões.
+            </SectionGuide>
             <BusinessModelCanvasGrid canvas={businessModelCanvas} />
           </Card>
         </section>
@@ -326,7 +353,10 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
         <section id="plano">
           <Card>
             <h2 className="text-2xl font-bold text-slate-900">Plano de Ação — Próximos Passos</h2>
-            <p className="mt-2 text-sm text-slate-500">Quando a chave OpenAI está configurada, esta seção é enriquecida por IA com base nos bairros, concorrentes, CNAEs, raio de análise e limitações encontradas.</p>
+            <p className="mt-2 text-sm text-slate-500">Quando a chave OpenAI está configurada, esta seção é enriquecida por IA com base no ramo informado, concorrentes, raio de análise, CEPs enviados quando existirem e limitações encontradas.</p>
+            <SectionGuide>
+              <strong>Como interpretar:</strong> comece pela prioridade 1. Cada ação traz o que fazer, como executar, prazo, responsável e KPI. A ideia é testar pequeno, medir resposta real e só então ampliar investimento.
+            </SectionGuide>
             <div className="mt-5 grid gap-4">
               {result.planoDeAcao.map((item) => (
                 <div key={item.prioridade} className="rounded-2xl border border-slate-200 p-4">
@@ -397,13 +427,14 @@ function normalizeBusinessModelCanvas(result: AnalysisResult): BusinessModelCanv
   // Este fallback garante que a tela continue abrindo e ainda mostre um Canvas util.
   const saved = (result as AnalysisResult & { businessModelCanvas?: Partial<BusinessModelCanvas> }).businessModelCanvas || {};
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
-  const segment = result.businessActivityDescription || result.selectedCnaes.map((cnae) => cnae.descricao).join(', ') || result.unidade.cnaePrincipalDescricao;
+  const segment = result.businessActivityDescription || result.unidade.cnaePrincipalDescricao;
+  const hasCustomerCepData = result.points.length > 0;
   const topBairro = result.afinidadePorBairro[0]?.bairro || result.unidade.bairro;
   const partner = result.strategicPlaces.find((place) => place.categoriaEstrategica === 'Oportunidade de parceria' || place.categoriaEstrategica === 'Polo gerador de público');
   const fallback: BusinessModelCanvas = {
-    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniência local e prova social para ${topBairro}.`],
-    segmentosDeClientes: [`Clientes próximos de ${topBairro}.`, 'Compradores que pesquisam e comparam opções no Google.'],
-    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', 'Campanhas por raio nos bairros prioritários.'],
+    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniência local e prova social no raio analisado.`],
+    segmentosDeClientes: [hasCustomerCepData ? `Clientes próximos de ${topBairro}.` : `Clientes potenciais no raio de ${result.analysisRadiusKm} km.`, 'Compradores que pesquisam e comparam opções no Google.'],
+    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', hasCustomerCepData ? 'Campanhas por raio nos bairros prioritários.' : `Campanhas por raio de ${result.analysisRadiusKm} km para validar demanda.`],
     relacionamentoComClientes: ['Atendimento consultivo, rápido e com próximo passo simples.', 'Follow-up por bairro, origem do lead e objeção registrada.'],
     fontesDeReceita: [`Venda direta de ${segment}.`, 'Pacotes, planos, recorrência ou serviços complementares quando fizer sentido.'],
     recursosChave: ['Perfil Google atualizado, argumentos comerciais e registro de leads.', 'Equipe ou responsável por resposta rápida.'],
@@ -452,8 +483,11 @@ function StatsPanel({ result }: { result: AnalysisResult }) {
     <Card>
       <h2 className="text-2xl font-bold text-slate-900">Estatísticas da análise</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        Estes números resumem a base analisada: CEPs enviados pelo usuário, distribuição dos clientes por distância até a empresa, bairros com maior presença na planilha e um índice geral de oportunidade calculado pela análise.
+        Estes números resumem a base analisada. Quando há CEPs, os gráficos mostram clientes por distância e bairro. Quando não há CEPs, os gráficos de clientes são omitidos e a análise se concentra no raio, nos concorrentes e no índice de oportunidade.
       </p>
+      <SectionGuide>
+        <strong>Como interpretar:</strong> não leia concorrentes como clientes. CEPs válidos representam apenas a planilha enviada; concorrentes e locais vêm do Google Places. Sem planilha, não há bairros de clientes para interpretar.
+      </SectionGuide>
       <div className="mt-5 grid gap-4 md:grid-cols-4">
         <Metric label="CEPs válidos" value={result.estatisticas.totalValidos} />
         <Metric label="CEPs ignorados" value={result.estatisticas.totalInvalidos} />
@@ -553,6 +587,10 @@ function EmptyChartMessage({ text }: { text: string }) {
   return <div className="mt-4 flex h-80 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">{text}</div>;
 }
 
+function SectionGuide({ children }: { children: ReactNode }) {
+  return <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900">{children}</div>;
+}
+
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-2xl bg-slate-50 p-4">
@@ -575,6 +613,9 @@ function Ranking({ title, items }: { title: string; items: AnalysisResult['afini
   return (
     <Card>
       <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+      <SectionGuide>
+        <strong>Como interpretar:</strong> este ranking usa somente CEPs de clientes enviados. A nota combina presença de clientes, distância e pressão competitiva local para ajudar a escolher onde testar campanhas e follow-up.
+      </SectionGuide>
       <div className="mt-5 space-y-3">
         {items.slice(0, 10).map((item, index) => (
           <div key={`${item.bairro}-${item.cidade}`} className="rounded-2xl border border-slate-200 p-4">

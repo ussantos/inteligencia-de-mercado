@@ -224,12 +224,13 @@ function normalizePrintBusinessModelCanvas(result: AnalysisResult): BusinessMode
   // A impressao tambem precisa abrir relatorios antigos, criados antes do Canvas existir.
   const saved = (result as AnalysisResult & { businessModelCanvas?: Partial<BusinessModelCanvas> }).businessModelCanvas || {};
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
-  const segment = result.businessActivityDescription || result.selectedCnaes.map((cnae) => cnae.descricao).join(', ') || result.unidade.cnaePrincipalDescricao;
+  const segment = result.businessActivityDescription || result.unidade.cnaePrincipalDescricao;
+  const hasCustomerCepData = result.points.length > 0;
   const topBairro = result.afinidadePorBairro[0]?.bairro || result.unidade.bairro;
   const fallback: BusinessModelCanvas = {
-    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniencia local e prova social para ${topBairro}.`],
-    segmentosDeClientes: [`Clientes proximos de ${topBairro}.`, 'Compradores que pesquisam e comparam opcoes no Google.'],
-    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', 'Campanhas por raio nos bairros prioritarios.'],
+    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniencia local e prova social no raio analisado.`],
+    segmentosDeClientes: [hasCustomerCepData ? `Clientes proximos de ${topBairro}.` : `Clientes potenciais no raio de ${result.analysisRadiusKm} km.`, 'Compradores que pesquisam e comparam opcoes no Google.'],
+    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', hasCustomerCepData ? 'Campanhas por raio nos bairros prioritarios.' : `Campanhas por raio de ${result.analysisRadiusKm} km para validar demanda.`],
     relacionamentoComClientes: ['Atendimento consultivo, rapido e com proximo passo simples.', 'Follow-up por bairro, origem do lead e objecao registrada.'],
     fontesDeReceita: [`Venda direta de ${segment}.`, 'Pacotes, planos, recorrencia ou servicos complementares quando fizer sentido.'],
     recursosChave: ['Perfil Google atualizado, argumentos comerciais e registro de leads.', 'Equipe ou responsavel por resposta rapida.'],
@@ -247,10 +248,11 @@ function normalizePrintBusinessModelCanvas(result: AnalysisResult): BusinessMode
 
 export function PrintableReport({ result }: { result: AnalysisResult }) {
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
+  const hasCustomerCepData = result.points.length > 0;
   const direct = result.strategicPlaces.filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente direto')).length;
   const indirect = result.strategicPlaces.filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente indireto')).length;
   const recommendations = result.recomendacoesInteligentes || {
-    prioridadePrincipal: 'Priorize os bairros com maior afinidade e valide a resposta comercial antes de ampliar investimento.',
+    prioridadePrincipal: hasCustomerCepData ? 'Priorize os bairros com clientes reais e valide a resposta comercial antes de ampliar investimento.' : 'Valide a demanda no raio analisado antes de assumir quais bairros concentram clientes.',
     brechaCompetitiva: 'Use conveniencia, clareza de oferta e prova social local para se diferenciar de alternativas proximas.',
     personaFoco: 'Foque decisores que precisam de confianca, resposta rapida e comparacao simples entre opcoes.',
     objecaoProvavel: 'A objecao mais provavel e comparacao de preco, reputacao ou conveniencia.',
@@ -264,10 +266,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
   const topEconomic = result.perfilEconomico.slice(0, 6);
   const distanceRows = result.estatisticas.distribuicaoDistancias.map((item, index) => ({ label: item.faixa, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
   const neighborhoodRows = result.estatisticas.topBairros.slice(0, 8).map((item, index) => ({ label: `${item.bairro}, ${item.cidade}`, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
-  const scopeLabel = [
-    result.selectedCnaes.length ? result.selectedCnaes.map((cnae) => cnae.descricao).join(' | ') : '',
-    result.businessActivityDescription ? `Descricao: ${result.businessActivityDescription}` : ''
-  ].filter(Boolean).join(' | ') || 'Escopo não informado';
+  const scopeLabel = result.businessActivityDescription ? `Ramo informado: ${result.businessActivityDescription}` : 'Ramo nao informado no relatorio antigo';
 
   return (
     <div id="analysis-report" className="print-report">
@@ -291,7 +290,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
 
         <div className="print-metrics-grid">
           <PrintMetric label="CEPs validos" value={result.estatisticas.totalValidos} />
-          <PrintMetric label="Bairros/regioes" value={result.estatisticas.topBairros.length} />
+          <PrintMetric label="Bairros de clientes" value={hasCustomerCepData ? result.estatisticas.topBairros.length : 'Sem planilha'} />
           <PrintMetric label="Concorrentes diretos" value={direct} />
           <PrintMetric label="Concorrentes indiretos" value={indirect} />
           <PrintMetric label="Oportunidade" value={`${result.estatisticas.indiceOportunidadeMercado}/100`} />
@@ -303,12 +302,11 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
             <p><strong>Razao social:</strong> {result.unidade.razaoSocial}</p>
             <p><strong>CNPJ:</strong> {result.unidade.cnpj}</p>
             <p><strong>Endereco:</strong> {result.unidade.logradouro}, {result.unidade.numero} - {result.unidade.bairro}, {result.unidade.municipio}/{result.unidade.uf}</p>
-            <p><strong>CNAE principal:</strong> {result.unidade.cnaePrincipalCodigo} - {result.unidade.cnaePrincipalDescricao}</p>
           </PrintBlock>
           <PrintBlock title="Escopo da analise">
             <p><strong>Escopo usado:</strong> {scopeLabel}</p>
-            {result.businessActivityDescription && <p><strong>Descricao informada:</strong> {result.businessActivityDescription}</p>}
             <p><strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}</p>
+            <p>{hasCustomerCepData ? 'Os bairros de clientes deste relatório vêm da planilha de CEPs enviada.' : 'Nenhuma planilha de CEPs foi enviada; o relatório não infere bairros de clientes a partir de concorrentes.'}</p>
           </PrintBlock>
         </div>
       </PrintPage>
@@ -316,10 +314,12 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       <PrintPage>
         <h2>Mapa e gráficos da análise</h2>
         <PrintGeoMap result={result} />
-        <div className="print-two-columns">
-          <PrintBarChart title="CEPs por faixa de distância" rows={distanceRows.length ? distanceRows : [{ label: 'Sem planilha', value: 0 }]} />
-          <PrintBarChart title="Bairros com mais CEPs enviados" rows={neighborhoodRows.length ? neighborhoodRows : [{ label: 'Sem bairros', value: 0 }]} />
-        </div>
+        {hasCustomerCepData && (
+          <div className="print-two-columns">
+            <PrintBarChart title="CEPs por faixa de distância" rows={distanceRows.length ? distanceRows : [{ label: 'Sem planilha', value: 0 }]} />
+            <PrintBarChart title="Bairros com mais CEPs enviados" rows={neighborhoodRows.length ? neighborhoodRows : [{ label: 'Sem bairros', value: 0 }]} />
+          </div>
+        )}
         <PrintCategoryChart result={result} />
       </PrintPage>
 
@@ -345,37 +345,42 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
         </PrintBlock>
 
         <div className="print-two-columns">
-          <PrintBlock title="Resumo de distância">
-            <p><strong>Distância média:</strong> {result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMediaKm) : 'Sem planilha'}</p>
-            <p><strong>Distância mediana:</strong> {result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMedianaKm) : 'Sem planilha'}</p>
-          </PrintBlock>
+          {hasCustomerCepData && (
+            <PrintBlock title="Resumo de distância dos clientes">
+              <p><strong>Distância média:</strong> {formatKm(result.estatisticas.distanciaMediaKm)}</p>
+              <p><strong>Distância mediana:</strong> {formatKm(result.estatisticas.distanciaMedianaKm)}</p>
+            </PrintBlock>
+          )}
           <PrintBlock title="Índice de oportunidade">
             <p>{result.estatisticas.indiceOportunidadeMercado}/100</p>
           </PrintBlock>
         </div>
       </PrintPage>
 
-      <PrintPage>
-        <h2>Bairros e oportunidades</h2>
-        <div className="print-two-columns">
-          <PrintBlock title="Indice de afinidade por bairro">
-            {topAffinity.map((item, index) => (
-              <div key={`${item.bairro}-${item.cidade}`} className="print-ranking-item">
-                <strong>{index + 1}. {item.bairro}, {item.cidade} - {item.score}/100</strong>
-                <p>{item.acaoRecomendada}</p>
-              </div>
-            ))}
-          </PrintBlock>
-          <PrintBlock title="Perfil economico e financeiro">
-            {topEconomic.map((item, index) => (
-              <div key={`${item.bairro}-${item.cidade}`} className="print-ranking-item">
-                <strong>{index + 1}. {item.bairro}, {item.cidade} - {item.score}/100</strong>
-                <p>{item.acaoRecomendada}</p>
-              </div>
-            ))}
-          </PrintBlock>
-        </div>
-      </PrintPage>
+      {hasCustomerCepData && (
+        <PrintPage>
+          <h2>Bairros de clientes e oportunidades</h2>
+          <p className="print-page-intro">Esta página usa somente os CEPs de clientes enviados pelo usuário. Ela não usa concorrentes como se fossem clientes.</p>
+          <div className="print-two-columns">
+            <PrintBlock title="Indice de afinidade por bairro de cliente">
+              {topAffinity.map((item, index) => (
+                <div key={`${item.bairro}-${item.cidade}`} className="print-ranking-item">
+                  <strong>{index + 1}. {item.bairro}, {item.cidade} - {item.score}/100</strong>
+                  <p>{item.acaoRecomendada}</p>
+                </div>
+              ))}
+            </PrintBlock>
+            <PrintBlock title="Leitura operacional dos bairros com clientes">
+              {topEconomic.map((item, index) => (
+                <div key={`${item.bairro}-${item.cidade}`} className="print-ranking-item">
+                  <strong>{index + 1}. {item.bairro}, {item.cidade} - {item.score}/100</strong>
+                  <p>{item.acaoRecomendada}</p>
+                </div>
+              ))}
+            </PrintBlock>
+          </div>
+        </PrintPage>
+      )}
 
       <PrintPage>
         <h2>Concorrentes, barreiras e posicionamento</h2>

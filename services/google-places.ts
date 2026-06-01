@@ -7,12 +7,11 @@ import { haversineKm } from '@/lib/haversine';
 import { assertMonthlyBudget } from '@/services/usage-budget';
 import {
   DEFAULT_COMPETITOR_TYPES,
-  getActiveCompetitorTypes,
   getConfigsForCompetitorTypes,
   type CompetitorType,
   type CompetitorTypeConfig
 } from '@/lib/competitor-types';
-import type { CategoriaEstrategica, CnaeOption, StrategicPlace, UnidadeNegocio } from '@/lib/types';
+import type { CategoriaEstrategica, StrategicPlace, UnidadeNegocio } from '@/lib/types';
 
 const TTL_30_DAYS = 30 * 24 * 60 * 60 * 1000;
 const GOOGLE_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
@@ -320,7 +319,6 @@ async function googleTextSearch(params: {
 function buildSearchJobs(input: {
   unidade: UnidadeNegocio;
   competitorTypes: CompetitorType[];
-  selectedCnaes: CnaeOption[];
   businessActivityDescription?: string;
 }): Array<{ query: string; config: CompetitorTypeConfig; competitorType: CompetitorType }> {
   // Um "job" e uma busca que sera enviada ao Google.
@@ -329,16 +327,7 @@ function buildSearchJobs(input: {
   const configs = getConfigsForCompetitorTypes(input.competitorTypes);
   const municipioUf = `${input.unidade.municipio} ${input.unidade.uf}`.trim();
   const description = String(input.businessActivityDescription || '').trim();
-  const selectedTerms = input.selectedCnaes.map((cnae) => cnae.descricao).map((term) => String(term || '').trim()).filter(Boolean);
-  const businessTerms = [
-    description,
-    ...selectedTerms,
-    ...(description || selectedTerms.length ? [] : [input.unidade.cnaePrincipalDescricao])
-  ].map((term) => String(term || '').trim()).filter(Boolean).slice(0, 6);
-  const cnaeTerms = input.selectedCnaes
-    .map((cnae) => cnae.descricao)
-    .filter(Boolean)
-    .slice(0, 4);
+  const businessTerms = [description].map((term) => String(term || '').trim()).filter(Boolean).slice(0, 3);
 
   const jobs: Array<{ query: string; config: CompetitorTypeConfig; competitorType: CompetitorType }> = [];
   for (const config of configs) {
@@ -347,13 +336,6 @@ function buildSearchJobs(input: {
       for (const term of businessTerms.slice(0, 3)) {
         jobs.push({ query: `${query} ${term} ${municipioUf}`.trim(), config, competitorType: config.type });
       }
-    }
-  }
-
-  for (const cnae of cnaeTerms) {
-    const directConfig = configs.find((config) => config.strategicCategoryHint === 'direto') || configs[0];
-    if (directConfig) {
-      jobs.push({ query: `${cnae} ${municipioUf}`.trim(), config: directConfig, competitorType: directConfig.type });
     }
   }
 
@@ -370,7 +352,6 @@ export async function getStrategicPlaces(input: {
   center: { lat: number; lng: number; cep: string };
   unidade: UnidadeNegocio;
   competitorTypes?: CompetitorType[];
-  selectedCnaes?: CnaeOption[];
   businessActivityDescription?: string;
   radiusKm?: number;
 }): Promise<StrategicPlacesResult> {
@@ -378,16 +359,10 @@ export async function getStrategicPlaces(input: {
   // Primeiro tenta cache; se nao tiver cache e houver chave Google, chama a API e salva o resultado.
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
   const activityDescription = String(input.businessActivityDescription || '').trim();
-  const selectedCnaes = input.selectedCnaes?.length
-    ? input.selectedCnaes
-    : activityDescription
-      ? []
-      : input.unidade.cnaes.slice(0, 1);
-  const radiusM = Math.max(1000, Math.min(50000, Math.round((input.radiusKm || 8) * 1000)));
+  const radiusM = Math.max(1000, Math.min(20000, Math.round((input.radiusKm || 4) * 1000)));
   const activityKey = normalizeText(activityDescription).slice(0, 120);
-  const cnaeKey = selectedCnaes.map((cnae) => `${cnae.codigo}-${cnae.descricao}`).sort().join('|');
   const typeKey = [...competitorTypes].sort().join('|');
-  const cacheKey = `google:v3:${input.center.cep}:${radiusM}:${typeKey}:${cnaeKey}:${activityKey}`;
+  const cacheKey = `google:v4:${input.center.cep}:${radiusM}:${typeKey}:${activityKey}`;
   const cached = await prisma.placesCache.findFirst({ where: { cacheKey, expiresAt: { gt: new Date() } } });
   if (cached) {
     const cachedPlaces = cached.resultsJson as unknown as StrategicPlace[];
@@ -400,20 +375,20 @@ export async function getStrategicPlaces(input: {
   if (!key) {
     return { places: [], diagnostics: ['Google Places não foi executado porque nenhuma variável de chave foi encontrada no runtime. Configure GOOGLE_PLACES_API_KEY ou GOOGLE_MAPS_SERVER_API_KEY.'] };
   }
+  if (!activityDescription) {
+    return { places: [], diagnostics: ['Google Places não foi executado porque o ramo de atividade não foi informado.'] };
+  }
 
   const maxSearches = Number(process.env.GOOGLE_PLACES_MAX_SEARCHES_PER_ANALYSIS || 24);
-  const jobs = buildSearchJobs({ unidade: input.unidade, competitorTypes, selectedCnaes, businessActivityDescription: activityDescription }).slice(0, Math.max(1, maxSearches));
+  const jobs = buildSearchJobs({ unidade: input.unidade, competitorTypes, businessActivityDescription: activityDescription }).slice(0, Math.max(1, maxSearches));
   const ownNames = [input.unidade.razaoSocial, input.unidade.nomeFantasia].filter(Boolean).map((value) => normalizeText(String(value)));
   const seen = new Set<string>();
   const places: StrategicPlace[] = [];
   let skippedOwnCompany = 0;
   let ownWebsiteChecks = 0;
   const ownCompanyReasons = new Set<string>();
-  const scopeForDiagnostics = [
-    activityDescription,
-    ...selectedCnaes.map((cnae) => cnae.descricao)
-  ].filter(Boolean).join(' | ');
-  const diagnostics: string[] = [`Google Places: usando ${source}, raio ${Math.round(radiusM / 1000)} km, ${jobs.length} busca(s), escopo: ${scopeForDiagnostics || input.unidade.cnaePrincipalDescricao}.`];
+  const scopeForDiagnostics = activityDescription;
+  const diagnostics: string[] = [`Google Places: usando ${source}, raio ${Math.round(radiusM / 1000)} km, ${jobs.length} busca(s), escopo: ${scopeForDiagnostics}.`];
 
   for (const job of jobs) {
     const search = await googleTextSearch({ query: job.query, lat: input.center.lat, lng: input.center.lng, radiusM });
@@ -501,7 +476,7 @@ export async function getStrategicPlaces(input: {
     create: {
       cacheKey,
       cep: input.center.cep,
-      domain: scopeForDiagnostics || input.unidade.cnaePrincipalDescricao,
+      domain: scopeForDiagnostics,
       searchType: `google-places:${typeKey}`,
       resultsJson: sorted as any,
       expiresAt: new Date(Date.now() + TTL_30_DAYS)

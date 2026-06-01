@@ -23,22 +23,22 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
   const payload = {
     empresa: {
       nome: base.unidade.nomeFantasia || base.unidade.razaoSocial,
-      cnaeCadastralPrincipal: `${base.unidade.cnaePrincipalCodigo} - ${base.unidade.cnaePrincipalDescricao}`,
       bairro: base.unidade.bairro,
       cidade: base.unidade.municipio
     },
     escopoInformadoPeloUsuario: {
       descricaoDoRamo: base.businessActivityDescription || null,
-      cnaesSelecionados: base.selectedCnaes,
       tiposDeConcorrentesSelecionados: base.competitorTypes
     },
+    haCepsDeClientes: base.points.length > 0,
+    cepsDeClientesEnviados: base.points.length,
     estatisticas: base.estatisticas,
     analysisRadiusKm: base.analysisRadiusKm,
     faseMercadoLocal: base.faseMercadoLocal,
     planoLocalInicial: base.planoDeAcao,
     canvasLocalInicial: base.businessModelCanvas,
     diagnosticoFontesPublicas: base.diagnosticoFontesPublicas,
-    topBairros: base.afinidadePorBairro.slice(0, 10),
+    topBairrosDeClientes: base.points.length ? base.afinidadePorBairro.slice(0, 10) : [],
     obstaculos: base.obstaculosMatricula.slice(0, 10),
     locais: base.strategicPlaces.slice(0, 40).map((place) => ({
       nome: place.nome,
@@ -58,9 +58,11 @@ Gere uma complementação em PT-BR, sem substituir a operação atual da empresa
 
 Para o campo "planoDeAcao", aja como consultor executivo e entregue recomendações realmente acionáveis:
 - Crie de 6 a 8 ações priorizadas.
-- Use os bairros, concorrentes, avaliações, CNAEs, obstáculos e fase de mercado disponíveis.
-- Respeite o escopo informado pelo usuário: descricaoDoRamo, cnaesSelecionados e tiposDeConcorrentesSelecionados. O CNAE cadastral principal serve apenas como contexto da empresa, não como permissão para mudar o segmento da análise.
+- Use o ramo informado pelo usuário, concorrentes, avaliações, obstáculos, raio e fase de mercado disponíveis.
+- Respeite o escopo informado pelo usuário: descricaoDoRamo e tiposDeConcorrentesSelecionados. Não mude o segmento da análise por causa de cadastro fiscal.
+- Se haCepsDeClientes for false, não infira afinidade por bairro, perfil econômico, bairros onde clientes moram ou concentração de clientes a partir dos concorrentes. Nesse caso, foque concorrentes ao redor, pressão competitiva, posicionamento e próximos testes para coletar dados reais de leads.
 - Cada ação deve começar com verbo de comando e dizer o que fazer, onde fazer e por que fazer.
+- Sempre explique "como fazer" em termos práticos: canal, público, passo operacional e métrica.
 - Evite conselhos genéricos como "melhorar marketing" sem canal, público, teste ou métrica.
 - Inclua pelo menos uma ação de curto prazo, uma de prova social/reputação, uma de campanha local, uma de abordagem comercial e uma de mensuração.
 - Se houver poucos dados do Google Places, deixe isso claro e proponha uma ação de validação manual.
@@ -73,7 +75,7 @@ Para o campo "recomendacoesInteligentes", seja ainda mais sintético:
 - A objeção e a resposta devem ajudar atendimento/vendas a decidir o que falar primeiro.
 
 Para o campo "businessModelCanvas", gere um Canvas do Modelo de Negócio aplicado:
-- Use os mesmos dados, escopo informado pelo usuário, concorrentes, bairros e limitações.
+- Use os mesmos dados, escopo informado pelo usuário, concorrentes, CEPs de clientes quando existirem e limitações.
 - Não transforme o Canvas em tarefa para o usuário preencher; entregue a síntese já pronta.
 - Cada bloco deve ter de 2 a 4 frases curtas e acionáveis.
 - Não invente parceiros, canais, bairros, números, avaliações ou fontes de receita que não façam sentido para o segmento informado.
