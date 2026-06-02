@@ -2,7 +2,7 @@
 
 // Tela principal da aplicacao.
 // Ela foi desenhada para funcionar sem login: o visitante informa o tipo de negocio,
-// escolhe uma localizacao e recebe uma analise regional simples.
+// escolhe uma localizacao e recebe uma analise regional objetiva.
 import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, MapPin, Radar, ShieldCheck, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -23,6 +23,8 @@ interface ParsedCeps {
 interface UploadedBlob {
   blobName: string;
 }
+
+type BusinessMode = 'existing' | 'new';
 
 const COURSE_REFERENCES = [
   {
@@ -192,6 +194,7 @@ function makeManualUnit(input: {
 export function MarketIntelligenceApp() {
   const [cnpj, setCnpj] = useState('');
   const [unidade, setUnidade] = useState<UnidadeNegocio | null>(null);
+  const [businessMode, setBusinessMode] = useState<BusinessMode | null>(null);
   const [businessName, setBusinessName] = useState('');
   const [businessActivityDescription, setBusinessActivityDescription] = useState('');
   const [manualCep, setManualCep] = useState('');
@@ -215,13 +218,16 @@ export function MarketIntelligenceApp() {
   const competitorOptions = useMemo(() => inferCompetitorOptions(businessActivityDescription), [businessActivityDescription]);
   const safeAnalysisRadiusKm = clampAnalysisRadius(analysisRadiusKm);
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
+  const isExistingFlow = businessMode === 'existing';
+  const isNewBusinessFlow = businessMode === 'new';
   const hasExistingBusiness = Boolean(unidade?.cnpj);
-  const resultStep = hasExistingBusiness ? 5 : 4;
+  const resultStep = isExistingFlow && hasExistingBusiness ? 5 : 4;
   const hasMarketScope = businessActivityDescription.trim().length >= 3;
   const hasManualAddress = manualAddress.trim().length >= 5 && manualCity.trim().length >= 2 && manualUf.trim().length >= 2;
-  const hasManualCep = normalizeCep(manualCep).length === 8;
-  const hasLocation = hasExistingBusiness || hasManualCep || hasManualAddress;
-  const canAnalyze = hasMarketScope && hasLocation && competitorTypes.length > 0 && !loadingAnalysis;
+  const hasManualCep = isValidCep(normalizeCep(manualCep));
+  const hasLocation = isExistingFlow ? hasExistingBusiness : isNewBusinessFlow && (hasManualCep || hasManualAddress);
+  const hasRequiredBusinessName = isExistingFlow || businessName.trim().length >= 2;
+  const canAnalyze = Boolean(businessMode) && hasRequiredBusinessName && hasMarketScope && hasLocation && competitorTypes.length > 0 && !loadingAnalysis;
 
   async function deleteTemporaryBlob(blob: UploadedBlob | null) {
     if (!blob) return false;
@@ -270,6 +276,14 @@ export function MarketIntelligenceApp() {
     if (uploadedBlob) await deleteTemporaryBlob(uploadedBlob);
     setUploadedBlob(null);
     setBlobWarning(null);
+  }
+
+  function chooseBusinessMode(mode: BusinessMode) {
+    setBusinessMode(mode);
+    setGlobalError(null);
+    if (mode === 'new') {
+      void clearExistingBusiness();
+    }
   }
 
   function toggleCompetitorType(type: CompetitorType) {
@@ -415,44 +429,86 @@ export function MarketIntelligenceApp() {
             <Badge className="bg-slate-100 text-slate-600">1 — Negocio e regiao</Badge>
             <h2 className="mt-4 text-2xl font-bold text-slate-900">Que negocio voce quer analisar?</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Voce pode analisar uma empresa existente ou estudar a abertura de um novo negocio. O campo mais importante e o ramo de atividade: farmácia, padaria, restaurante, curso de tecnologia, clinica, loja de roupas etc.
+              Primeiro informe se a empresa ja existe. Depois a ferramenta pede apenas os dados necessarios para localizar a regiao e entender o ramo de atuacao.
             </p>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-slate-800" htmlFor="business-name">Nome do negocio <span className="text-slate-400">(opcional)</span></label>
-                <Input id="business-name" value={businessName} onChange={(event) => setBusinessName(event.target.value)} placeholder="Ex: Padaria do Bairro" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-slate-800" htmlFor="manual-cep">CEP ou endereco de referencia</label>
-                <Input id="manual-cep" value={manualCep} onChange={(event) => setManualCep(event.target.value)} placeholder="Ex: 22775-003" />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atividade <span className="text-orange-600">(obrigatorio)</span></label>
-              <textarea
-                id="business-activity-description"
-                value={businessActivityDescription}
-                onChange={(event) => setBusinessActivityDescription(event.target.value.slice(0, 300))}
-                placeholder="Ex: restaurante italiano de bairro com foco em almoço executivo e delivery"
-                className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-              />
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                <span>Quanto mais especifico, mais coerente sera a busca por concorrentes.</span>
-                <span>{businessActivityDescription.length}/300</span>
+            <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-bold text-slate-900">Voce ja possui uma empresa?</p>
+              <p className="mt-1 text-sm text-slate-500">Escolha Sim para consultar um CNPJ existente, ou Nao para estudar um novo ponto comercial.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => chooseBusinessMode('existing')}
+                  className={`rounded-2xl border px-4 py-3 text-left transition ${isExistingFlow ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-300'}`}
+                >
+                  <span className="block font-bold text-slate-900">Sim, ja tenho uma empresa</span>
+                  <span className="mt-1 block text-sm text-slate-500">Vou informar o CNPJ para carregar dados cadastrais.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseBusinessMode('new')}
+                  className={`rounded-2xl border px-4 py-3 text-left transition ${isNewBusinessFlow ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-300'}`}
+                >
+                  <span className="block font-bold text-slate-900">Nao, estou estudando abrir uma empresa</span>
+                  <span className="mt-1 block text-sm text-slate-500">Vou informar nome pretendido e endereco de referencia.</span>
+                </button>
               </div>
             </div>
 
-            {!hasExistingBusiness && (
+            {isExistingFlow && (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 p-4">
+                <p className="text-sm font-semibold text-slate-800">Informe o CNPJ da empresa</p>
+                <p className="mt-1 text-sm text-slate-500">A consulta preenche dados cadastrais, localiza a empresa e libera a etapa opcional de CEPs de clientes.</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                  <Input value={cnpj} onChange={(event) => setCnpj(event.target.value)} placeholder="CNPJ — ex: 12.345.678/0001-90" />
+                  <Button className="whitespace-normal text-center md:whitespace-nowrap" onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>
+                    {loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
+                    Consultar CNPJ
+                  </Button>
+                </div>
+
+                {unidade && (
+                  <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-slate-800">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 font-semibold text-emerald-700">
+                        <CheckCircle2 className="h-5 w-5" />
+                        Empresa encontrada
+                      </div>
+                      <button type="button" onClick={clearExistingBusiness} className="inline-flex items-center rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50">
+                        <Trash2 className="mr-1 h-3 w-3" />
+                        Remover CNPJ
+                      </button>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <p><strong>Razao Social:</strong> {unidade.razaoSocial}</p>
+                      <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Nao informado'}</p>
+                      <p><strong>CNPJ:</strong> {formatCnpj(unidade.cnpj)}</p>
+                      <p><strong>Situacao:</strong> {unidade.situacaoCadastral}</p>
+                      <p><strong>CEP:</strong> {formatCep(unidade.cep)}</p>
+                      <p className="md:col-span-2"><strong>Endereco:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isNewBusinessFlow && (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                   <MapPin className="h-4 w-4 text-orange-600" />
-                  Localizacao do estudo
+                  Dados do novo negocio
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  Se voce informou um CEP valido, o endereco completo e opcional. Se preferir, preencha cidade, UF e endereco de referencia.
+                  Informe o nome pretendido e a localizacao onde voce imagina abrir a empresa. Um CEP valido ja ajuda bastante; endereco, cidade e UF deixam a leitura mais precisa.
                 </p>
+                <div className="mt-4">
+                  <label className="text-sm font-semibold text-slate-800" htmlFor="business-name">Nome pretendido para a empresa</label>
+                  <Input id="business-name" value={businessName} onChange={(event) => setBusinessName(event.target.value)} placeholder="Ex: Padaria do Bairro" />
+                </div>
+                <div className="mt-4">
+                  <label className="text-sm font-semibold text-slate-800" htmlFor="manual-cep">CEP de referencia <span className="text-slate-400">(opcional se preencher endereco)</span></label>
+                  <Input id="manual-cep" value={manualCep} onChange={(event) => setManualCep(event.target.value)} placeholder="Ex: 22775-003" />
+                </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-[2fr_1fr]">
                   <Input value={manualAddress} onChange={(event) => setManualAddress(event.target.value)} placeholder="Rua, avenida ou ponto de referencia" />
                   <Input value={manualNumber} onChange={(event) => setManualNumber(event.target.value)} placeholder="Numero" />
@@ -465,42 +521,26 @@ export function MarketIntelligenceApp() {
               </div>
             )}
 
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 p-4">
-              <p className="text-sm font-semibold text-slate-800">Ja tem CNPJ? Use como atalho opcional.</p>
-              <p className="mt-1 text-sm text-slate-500">O CNPJ preenche dados da empresa e libera o upload opcional de CEPs de clientes.</p>
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                <Input value={cnpj} onChange={(event) => setCnpj(event.target.value)} placeholder="CNPJ — ex: 12.345.678/0001-90" />
-                <Button className="whitespace-normal text-center md:whitespace-nowrap" onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>
-                  {loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
-                  Consultar CNPJ
-                </Button>
-              </div>
-
-              {unidade && (
-                <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-slate-800">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 font-semibold text-emerald-700">
-                      <CheckCircle2 className="h-5 w-5" />
-                      Empresa encontrada
-                    </div>
-                    <button type="button" onClick={clearExistingBusiness} className="inline-flex items-center rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50">
-                      <Trash2 className="mr-1 h-3 w-3" />
-                      Remover CNPJ
-                    </button>
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <p><strong>Razao Social:</strong> {unidade.razaoSocial}</p>
-                    <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Nao informado'}</p>
-                    <p><strong>CNPJ:</strong> {formatCnpj(unidade.cnpj)}</p>
-                    <p><strong>Situacao:</strong> {unidade.situacaoCadastral}</p>
-                    <p><strong>CEP:</strong> {formatCep(unidade.cep)}</p>
-                    <p className="md:col-span-2"><strong>Endereco:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
-                  </div>
+            {businessMode && (
+              <div className="mt-5">
+                <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atuacao <span className="text-orange-600">(obrigatorio)</span></label>
+                <textarea
+                  id="business-activity-description"
+                  value={businessActivityDescription}
+                  onChange={(event) => setBusinessActivityDescription(event.target.value.slice(0, 300))}
+                  placeholder="Ex: restaurante italiano de bairro com foco em almoço executivo e delivery"
+                  className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                />
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>Quanto mais especifico, mais coerente sera a busca por concorrentes.</span>
+                  <span>{businessActivityDescription.length}/300</span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </Card>
 
+          {businessMode && (
+            <>
           <Card>
             <Badge className="bg-slate-100 text-slate-600">2 — Concorrencia</Badge>
             <h2 className="mt-4 text-xl font-bold text-slate-900">Quais concorrentes devem entrar na leitura?</h2>
@@ -593,7 +633,7 @@ export function MarketIntelligenceApp() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <Badge className="bg-orange-100 text-orange-700">{resultStep} — Resultado</Badge>
-                <h2 className="mt-3 text-2xl font-bold text-slate-900">Gerar analise simplificada</h2>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900">Gerar analise de mercado</h2>
                 <p className="mt-2 text-sm text-slate-500">
                   A ferramenta vai analisar {businessActivityDescription.trim() || 'o ramo informado'} em um raio de {safeAnalysisRadiusKm} km, usando {hasExistingBusiness ? 'o endereco do CNPJ' : 'a localizacao informada'}.
                 </p>
@@ -605,10 +645,16 @@ export function MarketIntelligenceApp() {
             </div>
             {!canAnalyze && (
               <p className="mt-4 text-sm text-slate-500">
-                Para iniciar, informe o ramo de atividade, uma localizacao por CEP ou endereco, e mantenha pelo menos um tipo de concorrente selecionado.
+                {isExistingFlow && !hasExistingBusiness
+                  ? 'Para iniciar, informe e consulte o CNPJ da empresa.'
+                  : isNewBusinessFlow && !hasRequiredBusinessName
+                    ? 'Para iniciar, informe o nome pretendido da nova empresa.'
+                    : 'Para iniciar, informe o ramo de atuacao, uma localizacao por CEP ou endereco, e mantenha pelo menos um tipo de concorrente selecionado.'}
               </p>
             )}
           </Card>
+            </>
+          )}
         </section>
       </div>
     </main>
@@ -621,7 +667,7 @@ function Header() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-8">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligencia de Mercado</p>
-          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Analise regional simplificada</h1>
+          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Analise regional de mercado</h1>
         </div>
         <a href="https://www.myrobotbarra.com.br/" target="_blank" rel="noreferrer" className="hidden text-sm font-semibold text-slate-600 hover:text-orange-600 md:inline">
           My Robot Barra da Tijuca
@@ -639,7 +685,7 @@ function CourseReferences() {
           <Badge className="bg-orange-100 text-orange-700">Projeto educacional aplicado</Badge>
           <h2 className="mt-3 text-2xl font-bold text-slate-900">Ferramenta criada para praticar IA, dados e desenvolvimento de apps</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Esta aplicacao demonstra, em formato simples, conceitos ensinados nos cursos de Inteligencia Artificial e App Developer da My Robot Barra da Tijuca.
+            Esta aplicacao demonstra, em uma experiencia pratica, conceitos ensinados nos cursos de Inteligencia Artificial e App Developer da My Robot Barra da Tijuca.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">

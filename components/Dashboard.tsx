@@ -1,6 +1,6 @@
 'use client';
 
-// Relatorio simplificado.
+// Relatorio objetivo.
 // A ideia aqui e mostrar poucas secoes, com leitura direta para decisao comercial.
 import dynamic from 'next/dynamic';
 import { AlertTriangle, MapPinned, MessageSquareText, Printer, Sparkles, Star, Target } from 'lucide-react';

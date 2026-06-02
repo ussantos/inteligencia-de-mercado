@@ -48,7 +48,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Busca de concorrentes e locais relevantes via Google Places API.
 - Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras e locais relevantes.
 - Ranking de bairros de clientes apenas quando uma planilha de CEPs e enviada; sem CEPs, o relatorio omite afinidade e bairros de clientes e mostra somente concorrentes, barreiras e oportunidades ao redor.
-- Relatorio simplificado com resumo executivo, recomendacoes, mapa, concorrentes principais, clientes informados quando existirem e proximos passos.
+- Relatorio objetivo com resumo executivo, recomendacoes, mapa, concorrentes principais, clientes informados quando existirem e proximos passos.
 - Obstaculos de conversao, posicionamento e recomendacoes com explicacao de como interpretar cada secao.
 - Canvas Estrategico do Negocio mantido no relatorio impresso e no motor de analise, mas a tela prioriza uma leitura mais curta e vendavel.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, Canvas Estrategico, evolucao incremental e plano de acao.
