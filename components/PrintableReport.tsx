@@ -300,7 +300,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
         <div className="print-two-columns">
           <PrintBlock title="Empresa analisada">
             <p><strong>Razao social:</strong> {result.unidade.razaoSocial}</p>
-            <p><strong>CNPJ:</strong> {result.unidade.cnpj}</p>
+            {result.unidade.cnpj && <p><strong>CNPJ:</strong> {result.unidade.cnpj}</p>}
             <p><strong>Endereco:</strong> {result.unidade.logradouro}, {result.unidade.numero} - {result.unidade.bairro}, {result.unidade.municipio}/{result.unidade.uf}</p>
           </PrintBlock>
           <PrintBlock title="Escopo da analise">

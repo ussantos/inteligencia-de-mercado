@@ -1,12 +1,12 @@
-// Esta API e chamada quando o usuario clica para iniciar a analise.
-// Ela valida os dados recebidos, confere se o usuario esta logado e chama o motor principal de inteligencia de mercado.
+// Esta API e chamada quando o visitante clica para iniciar a analise.
+// Ela valida os dados recebidos, aplica limite por visitante e chama o motor principal de inteligencia de mercado.
 // O servidor faz isso para proteger chaves secretas e para poder salvar historico no banco.
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { assertUserRateLimit } from '@/services/rate-limit';
 import { runMarketAnalysis } from '@/services/analysis';
 import { DEFAULT_COMPETITOR_TYPES, isCompetitorType, type CompetitorType } from '@/lib/competitor-types';
+import { anonymousUserId } from '@/lib/visitor';
 
 const schema = z.object({
   unidade: z.any(),
@@ -21,10 +21,8 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-
   try {
+    const userId = anonymousUserId(request);
     await assertUserRateLimit(userId);
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) {

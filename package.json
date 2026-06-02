@@ -15,8 +15,6 @@
   },
   "dependencies": {
     "@azure/storage-blob": "^12.27.0",
-    "@clerk/localizations": "^3.25.0",
-    "@clerk/nextjs": "^6.35.0",
     "@prisma/client": "6.19.3",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",

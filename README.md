@@ -6,7 +6,7 @@ Aplicacao web independente para analise regional de concorrencia, oportunidades,
 
 A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um repositorio GitHub privado ou publico configurado no ambiente de deploy.
 
-Você pode testar a aplicação nesta URL: https://gray-glacier-0dc52610f.7.azurestaticapps.net/sign-in
+Voce pode testar a aplicacao nesta URL: https://gray-glacier-0dc52610f.7.azurestaticapps.net/
 
 ## Carater educativo, cursos e licenca
 
@@ -28,16 +28,18 @@ Nao inclua dados sensiveis, listas completas de clientes, credenciais, tokens, c
 
 ## Proposito
 
-A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise parte do CNPJ da empresa para localizar endereco e CEP, usa o ramo de atividade descrito pelo usuario como escopo principal, cruza a regiao com locais do Google Places, aceita uma planilha opcional de CEPs de clientes e gera recomendacoes para marketing, vendas, posicionamento e expansao local.
+A ferramenta transforma dados publicos e dados operacionais simples em um relatorio pratico de inteligencia de mercado. A analise pode partir de um negocio existente com CNPJ ou de um estudo de abertura de novo negocio. O usuario informa o ramo de atividade, uma localizacao por CEP ou endereco, escolhe o raio e os tipos de concorrentes, e a aplicacao cruza a regiao com locais do Google Places para gerar recomendacoes de marketing, vendas, posicionamento e proximos passos.
 
 ## Funcionalidades
 
-- Consulta de empresa por CNPJ usando fontes publicas, com cache em Postgres.
-- Identificacao automatica de endereco e CEP a partir do CNPJ.
+- Fluxo publico, sem login obrigatorio.
+- Consulta opcional de empresa por CNPJ usando fontes publicas, com cache em Postgres.
+- Identificacao automatica de endereco e CEP a partir do CNPJ quando ele e informado.
+- Analise manual para quem ainda nao tem empresa aberta: basta informar ramo de atividade e uma localizacao de referencia.
 - Descricao obrigatoria do ramo de atividade para definir o escopo real da analise e das consultas ao Google Places.
 - Selecao de tipos de concorrentes/alternativas de mercado; a busca de concorrentes deve respeitar o ramo informado e essas escolhas.
 - Analise por raio em torno do empreendimento, com slider de 1 a 20 km e padrao de 4 km.
-- Upload opcional de CSV/XLSX com CEPs de clientes.
+- Upload opcional de CSV/XLSX com CEPs de clientes apenas quando houver CNPJ de um negocio existente.
 - Exclusao do arquivo temporario do Azure Blob Storage depois que a analise termina com sucesso.
 - Modelo CSV baixavel para preencher CEPs antes do upload.
 - Normalizacao e validacao de CEPs.
@@ -46,22 +48,22 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - Busca de concorrentes e locais relevantes via Google Places API.
 - Mapa Google Maps com camadas para empresa, CEPs, concorrentes, barreiras e locais relevantes.
 - Ranking de bairros de clientes apenas quando uma planilha de CEPs e enviada; sem CEPs, o relatorio omite afinidade e bairros de clientes e mostra somente concorrentes, barreiras e oportunidades ao redor.
-- Obstaculos de conversao, posicionamento, personas e recomendacoes com explicacao de como interpretar cada secao.
-- Canvas Estrategico do Negocio gerado automaticamente a partir da analise, com proposta de valor, segmentos, canais, relacionamento, receitas, recursos, atividades, parcerias e custos.
+- Relatorio simplificado com resumo executivo, recomendacoes, mapa, concorrentes principais, clientes informados quando existirem e proximos passos.
+- Obstaculos de conversao, posicionamento e recomendacoes com explicacao de como interpretar cada secao.
+- Canvas Estrategico do Negocio mantido no relatorio impresso e no motor de analise, mas a tela prioriza uma leitura mais curta e vendavel.
 - Complemento opcional com OpenAI para enriquecer recomendacoes inteligentes, posicionamento, Canvas Estrategico, evolucao incremental e plano de acao.
 - Impressao da analise com layout especifico para PDF, em folha A4 retrato, com mapa esquematico, graficos, quebras de pagina controladas e secoes compactas para evitar cortes no meio do conteudo.
-- Historico e compartilhamento de analises.
-- Autenticacao Clerk protegendo a aplicacao principal na raiz `/`.
+- Historico e compartilhamento de analises por identificador anonimo do visitante.
 
 ## Rotas
 
 - `/` abre a aplicacao principal.
-- `/sign-in` abre a tela de login do Clerk.
+- `/sign-in` redireciona para `/` por compatibilidade com links antigos.
 - `/internal/market-intelligence` redireciona para `/` por compatibilidade com links antigos.
 - `/internal/shared/[uuid]` abre relatorios compartilhados em modo somente leitura.
 - `/api/analyze` executa a analise.
 - `/api/cnpj` consulta dados do CNPJ.
-- `/api/history` lista historico do usuario.
+- `/api/history` lista historico do visitante anonimo.
 - `/api/share` gera link compartilhavel.
 - `/api/blob/upload` envia arquivo temporario para o Azure Blob Storage pelo servidor.
 - `/api/blob/sas` gera SAS temporario para upload legado.
@@ -72,7 +74,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 
 - Framework: Next.js 15 com App Router.
 - UI: React 19, Tailwind CSS, lucide-react, Recharts e Google Maps JavaScript API.
-- Autenticacao: Clerk.
+- Autenticacao: nao ha login obrigatorio; a aplicacao usa identificador anonimo local para rate limit e historico simples.
 - Banco: PostgreSQL via Prisma 6.19.3.
 - Storage opcional: Azure Blob Storage para uploads temporarios.
 - Deploy: Azure Static Web Apps com GitHub Actions.
@@ -81,7 +83,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 
 ## Leitura do codigo
 
-Como este repositorio pode ser publico, os arquivos principais possuem comentarios explicativos em linguagem simples. A ideia e ajudar novos leitores a entenderem o fluxo da aplicacao sem precisar conhecer Next.js, Prisma, Clerk, Azure ou Google Places em profundidade.
+Como este repositorio pode ser publico, os arquivos principais possuem comentarios explicativos em linguagem simples. A ideia e ajudar novos leitores a entenderem o fluxo da aplicacao sem precisar conhecer Next.js, Prisma, Azure ou Google Places em profundidade.
 
 Os comentarios explicam o papel de paginas, componentes, APIs, servicos, tipos e configuracoes. Eles nao devem conter tokens, URLs privadas, connection strings, dados de clientes ou detalhes internos do ambiente de producao.
 
@@ -112,7 +114,7 @@ O build executa:
 prisma generate && next build && node scripts/prepare-standalone.js
 ```
 
-O `staticwebapp.config.json` define headers de seguranca, noindex, redirect de 401 para `/sign-in` e runtime `node:22`. O `next.config.js` usa `output: 'standalone'`, e o script `scripts/prepare-standalone.js` copia os arquivos estaticos e o cliente Prisma necessario para dentro do pacote gerado pelo Next.
+O `staticwebapp.config.json` define headers de seguranca, noindex e runtime `node:22`. O `next.config.js` usa `output: 'standalone'`, e o script `scripts/prepare-standalone.js` copia os arquivos estaticos e o cliente Prisma necessario para dentro do pacote gerado pelo Next.
 
 Existe apenas um workflow ativo para deploy:
 
@@ -130,20 +132,12 @@ O arquivo `.npmrc` do repositorio aponta para o registry publico do npm e desati
 
 Obrigatorias para a aplicacao principal:
 
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
 - `DATABASE_URL`
 - `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`
 
 Obrigatoria para exibir o mapa Google Maps no navegador:
 
 - `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
-
-Recomendadas para evitar loop de autenticacao em producao:
-
-- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 
 Recomendadas:
 
@@ -207,23 +201,6 @@ Configure:
 - `AZURE_STORAGE_CONNECTION_STRING`
 - `AZURE_STORAGE_CONTAINER_NAME`
 - Uma regra de lifecycle no container temporario, recomendada mesmo com a exclusao feita pela aplicacao.
-
-### Clerk
-
-Uso no projeto: autenticacao, tela `/sign-in`, protecao das rotas e sessao do usuario.
-
-Leia principalmente:
-
-- [Variaveis e chaves do Clerk](https://clerk.com/docs/upgrade-guides/api-keys), para separar publishable key e secret key.
-- [Pagina customizada de sign-in/sign-up do Clerk para Next.js](https://clerk.com/docs/nextjs/guides/development/custom-sign-in-or-up-page), para entender URLs de entrada e redirecionamento.
-
-Configure:
-
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 
 ### PostgreSQL e Prisma
 
@@ -397,9 +374,9 @@ https://places.googleapis.com/v1/places:searchText
 
 A chave deve ser server-side em `GOOGLE_MAPS_SERVER_API_KEY` ou `GOOGLE_PLACES_API_KEY`. A chave publica `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` serve para mapas no navegador e nao deve ser usada pelo backend para buscar concorrentes. A API precisa estar habilitada no Google Cloud e a conta precisa ter billing ativo.
 
-As consultas ao Google Places sao montadas a partir do ramo de atividade descrito pelo usuario e dos tipos de concorrentes escolhidos. O CNPJ serve para localizar a empresa e obter o ponto central do raio; o CNAE cadastral nao define a busca de concorrentes.
+As consultas ao Google Places sao montadas a partir do ramo de atividade descrito pelo usuario e dos tipos de concorrentes escolhidos. Quando o CNPJ e informado, ele ajuda a localizar uma empresa existente e confirmar dados cadastrais; quando nao ha CNPJ, a aplicacao usa o endereco informado manualmente como ponto central do raio. O CNAE cadastral nao define a busca de concorrentes.
 
-O Google Places nao retorna CNPJ diretamente. Para evitar listar a propria empresa como concorrente, a aplicacao cruza os resultados do Google com os dados do CNPJ analisado usando telefone, endereco, coordenadas, dominio do site/e-mail, similaridade de nome e, quando o site do resultado esta disponivel, busca o CNPJ da empresa na pagina retornada. Resultados identificados como a propria empresa sao removidos antes do relatorio.
+O Google Places nao retorna CNPJ diretamente. Quando ha CNPJ informado, para evitar listar a propria empresa como concorrente, a aplicacao cruza os resultados do Google com os dados cadastrais usando telefone, endereco, coordenadas, dominio do site/e-mail, similaridade de nome e, quando o site do resultado esta disponivel, busca o CNPJ da empresa na pagina retornada. Resultados identificados como a propria empresa sao removidos antes do relatorio.
 
 Se o diagnostico mostrar `API_KEY_HTTP_REFERRER_BLOCKED`, a chave usada no backend esta restrita por site/referrer. Crie uma chave separada para o servidor, permita a **Places API** nas restricoes de API e nao aplique restricao de HTTP referrer nessa chave. Depois cadastre essa chave no Azure Static Web Apps e nos secrets do GitHub como `GOOGLE_MAPS_SERVER_API_KEY` ou substitua `GOOGLE_PLACES_API_KEY`.
 
@@ -492,9 +469,9 @@ Isso significa que ainda nao houve deploy valido para a SWA. Verifique:
 - O workflow usa `output_location: ""`, nao `build`.
 - O build termina sem erro.
 
-### A aplicacao redireciona para login
+### A aplicacao ainda abre `/sign-in`
 
-Isso e esperado. A rota principal `/` e protegida pelo Clerk.
+O fluxo atual nao usa login. A rota `/sign-in` existe apenas por compatibilidade com links antigos e redireciona para `/`. Se o navegador insistir em abrir `/sign-in`, limpe cache ou use diretamente a raiz do site.
 
 ### Erro de Prisma no build
 
@@ -560,7 +537,7 @@ Independent web application for regional competitor analysis, opportunity mappin
 
 The application is prepared to run on Azure Static Web Apps, connected to a private or public GitHub repository configured in the deployment environment.
 
-You can test the application at: https://gray-glacier-0dc52610f.7.azurestaticapps.net/sign-in
+You can test the application at: https://gray-glacier-0dc52610f.7.azurestaticapps.net/
 
 ## Educational Purpose, Courses, and License
 
@@ -582,16 +559,18 @@ Do not include sensitive data, complete customer lists, credentials, tokens, con
 
 ## Purpose
 
-The tool transforms public data and simple operational data into a practical market intelligence report. The analysis starts from the company's CNPJ to locate address and ZIP/postal code, uses the business activity described by the user as the main scope, compares the region with locations from Google Places, accepts an optional customer ZIP/postal code spreadsheet, and generates recommendations for marketing, sales, positioning, and local expansion.
+The tool transforms public data and simple operational data into a practical market intelligence report. The analysis can start from an existing business with a CNPJ or from a new-business study. The user provides the business activity, a reference location by ZIP/postal code or address, the radius, and the competitor types; the application compares the region with Google Places results and generates recommendations for marketing, sales, positioning, and next steps.
 
 ## Features
 
-- Company lookup by CNPJ using public sources, with PostgreSQL cache.
-- Automatic identification of address and ZIP/postal code from the CNPJ.
+- Public workflow with no required login.
+- Optional company lookup by CNPJ using public sources, with PostgreSQL cache.
+- Automatic identification of address and ZIP/postal code from the CNPJ when provided.
+- Manual study flow for users who do not have an open company yet: business activity plus a reference location is enough.
 - Required business activity description to define the real scope of the analysis and Google Places queries.
 - Selection of competitor or market alternative types; competitor searches should respect the described activity and these user choices.
 - Radius-based analysis around the business with a 1 to 20 km slider and a 4 km default.
-- Optional CSV/XLSX upload with customer ZIP/postal codes.
+- Optional CSV/XLSX upload with customer ZIP/postal codes only when an existing business CNPJ is provided.
 - Deletion of the temporary Azure Blob Storage file after the analysis completes successfully.
 - Downloadable CSV template for ZIP/postal codes.
 - ZIP/postal code normalization and validation.
@@ -600,22 +579,22 @@ The tool transforms public data and simple operational data into a practical mar
 - Competitor and relevant-place search through Google Places API.
 - Google Maps view with layers for the company, customer ZIP/postal codes, competitors, barriers, and relevant places.
 - Customer neighborhood ranking only when a ZIP/postal code spreadsheet is uploaded; without ZIP/postal codes, the report omits customer affinity and customer neighborhoods and shows only nearby competitors, obstacles, and opportunities.
-- Conversion barriers, positioning, personas, and recommendations with explanations about how to interpret each section.
-- Automatically generated Strategic Business Canvas with value proposition, segments, channels, relationships, revenue, resources, activities, partnerships, and costs.
+- Simplified result page with executive summary, recommendations, map, main competitors, customer ZIP/postal codes when available, and next steps.
+- Conversion barriers, positioning, and recommendations with explanations about how to interpret each section.
+- Strategic Business Canvas still generated by the analysis engine and available in the print report, while the screen prioritizes a shorter, more sellable view.
 - Optional OpenAI enrichment for smarter recommendations, positioning, Strategic Business Canvas, incremental evolution, and action planning.
 - Print-ready analysis layout for PDF, using A4 portrait pages, schematic map, charts, controlled page breaks, and compact sections to avoid splitting content in the middle.
-- Analysis history and shareable reports.
-- Clerk authentication protecting the main application at `/`.
+- Analysis history and shareable reports by anonymous visitor identifier.
 
 ## Routes
 
 - `/` opens the main application.
-- `/sign-in` opens the Clerk login screen.
+- `/sign-in` redirects to `/` for compatibility with old links.
 - `/internal/market-intelligence` redirects to `/` for compatibility with old links.
 - `/internal/shared/[uuid]` opens shared reports in read-only mode.
 - `/api/analyze` runs the analysis.
 - `/api/cnpj` fetches CNPJ data.
-- `/api/history` lists the user's analysis history.
+- `/api/history` lists the anonymous visitor history.
 - `/api/share` creates a shareable link.
 - `/api/blob/upload` uploads a temporary file to Azure Blob Storage through the server.
 - `/api/blob/sas` creates a temporary SAS for legacy upload flows.
@@ -626,7 +605,7 @@ The tool transforms public data and simple operational data into a practical mar
 
 - Framework: Next.js 15 with App Router.
 - UI: React 19, Tailwind CSS, lucide-react, Recharts, and Google Maps JavaScript API.
-- Authentication: Clerk.
+- Authentication: no required login; the application uses a local anonymous identifier for basic rate limiting and simple history.
 - Database: PostgreSQL through Prisma 6.19.3.
 - Optional storage: Azure Blob Storage for temporary uploads.
 - Deployment: Azure Static Web Apps with GitHub Actions.
@@ -635,7 +614,7 @@ The tool transforms public data and simple operational data into a practical mar
 
 ## Code Readability
 
-Because this repository may be public, the main files include explanatory comments in simple language. The goal is to help new readers understand the application flow without deep knowledge of Next.js, Prisma, Clerk, Azure, or Google Places.
+Because this repository may be public, the main files include explanatory comments in simple language. The goal is to help new readers understand the application flow without deep knowledge of Next.js, Prisma, Azure, or Google Places.
 
 Comments explain the purpose of pages, components, APIs, services, types, and configuration. They must not include tokens, private URLs, connection strings, customer data, or internal production details.
 
@@ -666,7 +645,7 @@ The build runs:
 prisma generate && next build && node scripts/prepare-standalone.js
 ```
 
-`staticwebapp.config.json` defines security headers, noindex, 401 redirect to `/sign-in`, and `node:22` runtime. `next.config.js` uses `output: 'standalone'`, and `scripts/prepare-standalone.js` copies static files and the Prisma client needed inside the package generated by Next.js.
+`staticwebapp.config.json` defines security headers, noindex, and `node:22` runtime. `next.config.js` uses `output: 'standalone'`, and `scripts/prepare-standalone.js` copies static files and the Prisma client needed inside the package generated by Next.js.
 
 There should be only one active deployment workflow:
 
@@ -682,20 +661,12 @@ See `.env.example`. Never commit `.env`, `.env.local`, tokens, connection string
 
 Required for the main application:
 
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
 - `DATABASE_URL`
 - `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`
 
 Required to display Google Maps in the browser:
 
 - `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`
-
-Recommended to avoid authentication redirect loops in production:
-
-- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 
 Recommended:
 
@@ -759,23 +730,6 @@ Configure:
 - `AZURE_STORAGE_CONNECTION_STRING`
 - `AZURE_STORAGE_CONTAINER_NAME`
 - A lifecycle rule on the temporary container, recommended even though the application deletes files after successful analysis.
-
-### Clerk
-
-Used for authentication, `/sign-in`, route protection, and user sessions.
-
-Read:
-
-- [Clerk API keys](https://clerk.com/docs/upgrade-guides/api-keys)
-- [Custom sign-in/sign-up page for Clerk and Next.js](https://clerk.com/docs/nextjs/guides/development/custom-sign-in-or-up-page)
-
-Configure:
-
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
-- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 
 ### PostgreSQL and Prisma
 
@@ -949,9 +903,9 @@ https://places.googleapis.com/v1/places:searchText
 
 The key must be server-side in `GOOGLE_MAPS_SERVER_API_KEY` or `GOOGLE_PLACES_API_KEY`. The public `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` is only for browser maps and must not be used by the backend to search competitors. The API must be enabled in Google Cloud and billing must be active.
 
-Google Places queries are built from the business activity described by the user and the selected competitor types. The CNPJ is used to locate the company and obtain the center point for the radius; the registered CNAE does not define competitor searches.
+Google Places queries are built from the business activity described by the user and the selected competitor types. When a CNPJ is provided, it helps locate an existing company and confirm registration data; when there is no CNPJ, the application uses the manually entered address as the radius center point. The registered CNAE does not define competitor searches.
 
-Google Places does not return CNPJ directly. To avoid listing the analyzed company as its own competitor, the application cross-checks Google results against the CNPJ record using phone number, address, coordinates, website/email domain, name similarity, and, when the result website is available, scans the returned page for the company's CNPJ. Results identified as the same company are removed before the report is generated.
+Google Places does not return CNPJ directly. When a CNPJ is provided, to avoid listing the analyzed company as its own competitor, the application cross-checks Google results against the registration record using phone number, address, coordinates, website/email domain, name similarity, and, when the result website is available, scans the returned page for the company's CNPJ. Results identified as the same company are removed before the report is generated.
 
 If diagnostics show `API_KEY_HTTP_REFERRER_BLOCKED`, the backend key is restricted by site/referrer. Create a separate server key, allow **Places API** in API restrictions, and do not apply HTTP referrer restrictions to that key. Then register it in Azure Static Web Apps and GitHub Secrets as `GOOGLE_MAPS_SERVER_API_KEY`, or replace `GOOGLE_PLACES_API_KEY`.
 
@@ -1044,9 +998,9 @@ This means there has not been a valid deployment to the SWA yet. Check:
 - The workflow uses `output_location: ""`, not `build`.
 - The build finishes without errors.
 
-### The Application Redirects to Login
+### The Application Still Opens `/sign-in`
 
-This is expected. The main route `/` is protected by Clerk.
+The current flow does not use login. `/sign-in` exists only for compatibility with old links and redirects to `/`. If the browser keeps opening `/sign-in`, clear cache or use the site root directly.
 
 ### Prisma Error During Build
 

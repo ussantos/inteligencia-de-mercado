@@ -1,13 +1,12 @@
 'use client';
 
-// Este componente e a tela principal que o usuario usa.
-// Ele guarda o que a pessoa digitou, consulta CNPJ, le arquivos de CEPs e pede a analise ao servidor.
-// "use client" significa que este codigo roda no navegador, porque precisa reagir a cliques e uploads.
-import { UserButton, useAuth, useClerk, useUser } from '@clerk/nextjs';
-import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, LogOut, Radar, ShieldCheck } from 'lucide-react';
+// Tela principal da aplicacao.
+// Ela foi desenhada para funcionar sem login: o visitante informa o tipo de negocio,
+// escolhe uma localizacao e recebe uma analise regional simples.
+import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, MapPin, Radar, ShieldCheck, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dashboard } from '@/components/Dashboard';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { normalizeCep, isValidCep, detectCepColumn } from '@/lib/cep';
@@ -25,9 +24,40 @@ interface UploadedBlob {
   blobName: string;
 }
 
+const COURSE_REFERENCES = [
+  {
+    title: 'Inteligência Artificial',
+    href: 'https://www.myrobotbarra.com.br/inteligencia-artificial.html',
+    logo: 'https://www.myrobotbarra.com.br/assets/images/course-logos/inteligencia-artificial.webp'
+  },
+  {
+    title: 'App Developer',
+    href: 'https://www.myrobotbarra.com.br/app-developer.html',
+    logo: 'https://www.myrobotbarra.com.br/assets/images/course-logos/appdeveloper.webp'
+  }
+];
+
+function visitorId() {
+  // O site nao pede login. Este identificador anonimo ajuda o servidor a aplicar rate limit basico.
+  if (typeof window === 'undefined') return 'server';
+  const key = 'market-intelligence-visitor-id';
+  const existing = window.localStorage.getItem(key);
+  if (existing) return existing;
+  const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  window.localStorage.setItem(key, id);
+  return id;
+}
+
+function jsonHeaders() {
+  return { 'Content-Type': 'application/json', 'x-visitor-id': visitorId() };
+}
+
+function requestHeaders() {
+  return { 'x-visitor-id': visitorId() };
+}
+
 function parseRows(rows: Record<string, unknown>[]): ParsedCeps {
-  // A planilha pode ter muitas colunas, mas a aplicacao so precisa da coluna de CEP.
-  // Se existirem colunas sensiveis, como telefone ou CPF, avisamos o usuario e ignoramos esses dados.
+  // A planilha pode ter muitas colunas, mas a analise usa apenas a coluna de CEP.
   if (!rows.length) return { ceps: [], errors: ['Nenhum dado encontrado no arquivo.'], sensitiveWarning: false };
   const headers = Object.keys(rows[0]);
   const cepIndex = detectCepColumn(headers);
@@ -42,15 +72,14 @@ function parseRows(rows: Record<string, unknown>[]): ParsedCeps {
     if (!value) return;
     const cep = normalizeCep(value);
     if (isValidCep(cep)) ceps.push(cep);
-    else errors.push(`CEP inválido na linha ${idx + 2}: ${value}`);
+    else errors.push(`CEP invalido na linha ${idx + 2}: ${value}`);
   });
 
   return { ceps, errors, sensitiveWarning };
 }
 
 async function parseFile(file: File): Promise<ParsedCeps> {
-  // O navegador le CSV e XLSX de formas diferentes.
-  // Aqui decidimos qual leitor usar olhando o final do nome do arquivo.
+  // CSV e XLSX sao lidos no navegador. Assim dados pessoais nao precisam sair da maquina.
   if (file.size > 50 * 1024 * 1024) {
     return { ceps: [], errors: ['Arquivo maior que o limite permitido de 50MB'], sensitiveWarning: false };
   }
@@ -74,12 +103,10 @@ async function parseFile(file: File): Promise<ParsedCeps> {
     return parseRows(rows);
   }
 
-  return { ceps: [], errors: ['Formato de arquivo não suportado. Use .csv ou .xlsx'], sensitiveWarning: false };
+  return { ceps: [], errors: ['Formato de arquivo nao suportado. Use .csv ou .xlsx'], sensitiveWarning: false };
 }
 
 function clampAnalysisRadius(value: number) {
-  // O servidor aceita de 1 a 20 km.
-  // Esta funcao impede que a tela envie texto vazio, 830 km ou outro valor fora do limite.
   if (!Number.isFinite(value)) return 4;
   return Math.min(20, Math.max(1, Math.round(value)));
 }
@@ -89,17 +116,16 @@ function normalizeText(value: string) {
 }
 
 function inferCompetitorOptions(activityDescription: string): Array<{ type: CompetitorType; reason: string; suggested: boolean }> {
-  // A lista base continua sendo a mesma, mas a ordem e as dicas mudam conforme o ramo informado.
-  // "Todos" permanece como padrao porque e a escolha mais segura para quem quer uma primeira analise ampla.
+  // A ordem das opcoes muda de acordo com o ramo informado, mas "Todos" continua sendo o padrao.
   const text = normalizeText(activityDescription);
   const suggested = new Set<CompetitorType>(['Todos', 'Concorrentes diretos do ramo informado', 'Concorrentes locais similares', 'Concorrentes bem avaliados no Google']);
 
   if (/educa|ensino|trein|curso|idioma|informatica|escola|aula/.test(text)) {
-    ['Polos geradores de público', 'Negócios complementares para parceria', 'Marketplaces, delivery e canais digitais', 'Substitutos e alternativas de compra'].forEach((type) => suggested.add(type as CompetitorType));
-  } else if (/comerc|varej|loja|equipamento|livro|produto/.test(text)) {
-    ['Redes e franquias do setor', 'Marketplaces, delivery e canais digitais', 'Polos geradores de público', 'Negócios complementares para parceria'].forEach((type) => suggested.add(type as CompetitorType));
-  } else if (/saude|clinica|medic|odont|terap|estet/.test(text)) {
-    ['Prestadores autônomos e pequenos negócios', 'Barreiras de acesso e conveniência', 'Polos geradores de público'].forEach((type) => suggested.add(type as CompetitorType));
+    ['Polos geradores de público', 'Negócios complementares para parceria', 'Substitutos e alternativas de compra'].forEach((type) => suggested.add(type as CompetitorType));
+  } else if (/farm|saude|clinica|medic|odont|terap|estet/.test(text)) {
+    ['Redes e franquias do setor', 'Prestadores autônomos e pequenos negócios', 'Barreiras de acesso e conveniência'].forEach((type) => suggested.add(type as CompetitorType));
+  } else if (/padaria|restaurante|bar|lanche|mercado|comida|delivery|aliment/.test(text)) {
+    ['Redes e franquias do setor', 'Marketplaces, delivery e canais digitais', 'Polos geradores de público'].forEach((type) => suggested.add(type as CompetitorType));
   } else if (/servic|consult|manutenc|tecnic|profissional/.test(text)) {
     ['Prestadores autônomos e pequenos negócios', 'Substitutos e alternativas de compra', 'Negócios complementares para parceria'].forEach((type) => suggested.add(type as CompetitorType));
   } else {
@@ -107,17 +133,17 @@ function inferCompetitorOptions(activityDescription: string): Array<{ type: Comp
   }
 
   const reasons: Record<CompetitorType, string> = {
-    Todos: 'Recomendado para a primeira análise: combina ramo informado, concorrentes diretos, alternativas indiretas e locais relevantes.',
-    'Concorrentes diretos do ramo informado': 'Busca empresas com oferta próxima ao ramo descrito pelo usuário.',
-    'Concorrentes locais similares': 'Procura negócios parecidos na mesma região, mesmo quando usam outra descrição pública.',
-    'Redes e franquias do setor': 'Ajuda a identificar marcas estruturadas que competem por preço, presença ou confiança.',
-    'Substitutos e alternativas de compra': 'Mapeia opções que resolvem o mesmo problema do cliente de outro jeito.',
-    'Prestadores autônomos e pequenos negócios': 'Encontra alternativas menores, profissionais independentes e ofertas de bairro.',
-    'Marketplaces, delivery e canais digitais': 'Considera concorrência online, aplicativos e canais digitais ligados ao segmento.',
-    'Polos geradores de público': 'Mostra locais que concentram pessoas e podem influenciar demanda, parcerias ou fluxo.',
-    'Negócios complementares para parceria': 'Busca empresas que podem indicar clientes, fazer ações conjuntas ou complementar a oferta.',
-    'Barreiras de acesso e conveniência': 'Avalia fatores de acesso, estacionamento, transporte e conveniência regional.',
-    'Concorrentes bem avaliados no Google': 'Prioriza negócios com boa reputação pública e muitas avaliações.'
+    Todos: 'Recomendado para uma primeira leitura ampla da regiao.',
+    'Concorrentes diretos do ramo informado': 'Busca empresas com oferta parecida com o ramo descrito.',
+    'Concorrentes locais similares': 'Encontra negocios parecidos mesmo quando usam outra descricao publica.',
+    'Redes e franquias do setor': 'Mostra marcas estruturadas que competem por preco, confianca ou presenca.',
+    'Substitutos e alternativas de compra': 'Mapeia opcoes que resolvem o mesmo problema de outro jeito.',
+    'Prestadores autônomos e pequenos negócios': 'Considera profissionais independentes e ofertas menores.',
+    'Marketplaces, delivery e canais digitais': 'Inclui canais digitais, aplicativos e venda online quando fizer sentido.',
+    'Polos geradores de público': 'Mostra locais que concentram fluxo e podem influenciar demanda.',
+    'Negócios complementares para parceria': 'Encontra negocios que podem indicar clientes ou fazer acoes conjuntas.',
+    'Barreiras de acesso e conveniência': 'Observa fatores de acesso, conveniencia e deslocamento.',
+    'Concorrentes bem avaliados no Google': 'Prioriza negocios com reputacao publica forte.'
   };
 
   return [...COMPETITOR_TYPES]
@@ -125,15 +151,55 @@ function inferCompetitorOptions(activityDescription: string): Array<{ type: Comp
     .sort((a, b) => Number(!a.suggested) - Number(!b.suggested) || COMPETITOR_TYPES.indexOf(a.type) - COMPETITOR_TYPES.indexOf(b.type));
 }
 
+function makeManualUnit(input: {
+  businessName: string;
+  businessActivityDescription: string;
+  manualCep: string;
+  manualAddress: string;
+  manualNumber: string;
+  manualNeighborhood: string;
+  manualCity: string;
+  manualUf: string;
+}): UnidadeNegocio {
+  // Unidade manual representa um estudo de negocio novo, sem CNPJ aberto.
+  const activity = input.businessActivityDescription.trim();
+  const name = input.businessName.trim() || `Estudo de mercado: ${activity}`;
+  return {
+    cnpj: '',
+    razaoSocial: name,
+    nomeFantasia: input.businessName.trim() || null,
+    situacaoCadastral: 'Estudo sem CNPJ',
+    cnaePrincipalCodigo: '',
+    cnaePrincipalDescricao: 'Ramo informado manualmente',
+    cnaeSecundarios: [],
+    cnaes: [],
+    logradouro: input.manualAddress.trim(),
+    numero: input.manualNumber.trim() || 's/n',
+    complemento: null,
+    bairro: input.manualNeighborhood.trim(),
+    municipio: input.manualCity.trim(),
+    uf: input.manualUf.trim().toUpperCase(),
+    cep: normalizeCep(input.manualCep),
+    telefone: null,
+    email: null,
+    porte: null,
+    naturezaJuridica: null,
+    capitalSocial: null,
+    dataAbertura: null
+  };
+}
+
 export function MarketIntelligenceApp() {
-  // Estes estados sao como caixinhas de memoria da tela.
-  // Cada caixinha guarda uma parte do formulario ou do resultado para o React redesenhar a tela quando algo muda.
-  const { user } = useUser();
-  const { getToken, isLoaded, isSignedIn } = useAuth();
-  const { signOut } = useClerk();
   const [cnpj, setCnpj] = useState('');
   const [unidade, setUnidade] = useState<UnidadeNegocio | null>(null);
+  const [businessName, setBusinessName] = useState('');
   const [businessActivityDescription, setBusinessActivityDescription] = useState('');
+  const [manualCep, setManualCep] = useState('');
+  const [manualAddress, setManualAddress] = useState('');
+  const [manualNumber, setManualNumber] = useState('');
+  const [manualNeighborhood, setManualNeighborhood] = useState('');
+  const [manualCity, setManualCity] = useState('');
+  const [manualUf, setManualUf] = useState('RJ');
   const [competitorTypes, setCompetitorTypes] = useState<CompetitorType[]>(DEFAULT_COMPETITOR_TYPES);
   const [analysisRadiusKm, setAnalysisRadiusKm] = useState(4);
   const [ceps, setCeps] = useState<string[]>([]);
@@ -145,73 +211,24 @@ export function MarketIntelligenceApp() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [blobWarning, setBlobWarning] = useState<string | null>(null);
   const [uploadedBlob, setUploadedBlob] = useState<UploadedBlob | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
 
   const competitorOptions = useMemo(() => inferCompetitorOptions(businessActivityDescription), [businessActivityDescription]);
   const safeAnalysisRadiusKm = clampAnalysisRadius(analysisRadiusKm);
-  const hasMarketScope = businessActivityDescription.trim().length >= 3;
-  const canAnalyze = Boolean(unidade && hasMarketScope && competitorTypes.length > 0 && !loadingAnalysis);
   const uniqueCeps = useMemo(() => [...new Set(ceps)], [ceps]);
-
-  useEffect(() => {
-    // Se o navegador ficou com uma sessao antiga ou incompleta, mandamos a pessoa para o login.
-    // Isso evita a tela parecer logada enquanto as APIs do servidor respondem "Nao autenticado".
-    if (isLoaded && !isSignedIn) {
-      window.location.replace('/sign-in');
-    }
-  }, [isLoaded, isSignedIn]);
-
-  async function jsonAuthHeaders() {
-    // O Azure/Next pode nao repassar cookies do Clerk do jeito esperado em todos os cenarios.
-    // Por isso enviamos tambem o token Bearer, deixando as APIs reconhecerem a sessao de forma explicita.
-    const token = await getToken();
-    if (!token) {
-      throw new Error('Sua sessão expirou. Clique em Sair e entre novamente.');
-    }
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    };
-  }
-
-  async function bearerAuthHeaders() {
-    // Para FormData nao podemos definir Content-Type manualmente.
-    // O navegador precisa criar o boundary do multipart sozinho; enviamos apenas o Bearer token.
-    const token = await getToken();
-    if (!token) {
-      throw new Error('Sua sessão expirou. Clique em Sair e entre novamente.');
-    }
-    return { Authorization: `Bearer ${token}` };
-  }
-
-  async function handleUnauthorized(error: unknown, fallback: string) {
-    const message = error instanceof Error ? error.message : fallback;
-    if (/não autenticado|nao autenticado|sessão expirou|sessao expirou/i.test(message)) {
-      setGlobalError('Sua sessão expirou ou ficou inconsistente. Entre novamente para continuar.');
-      return;
-    }
-    setGlobalError(message);
-  }
-
-  async function handleSignOut() {
-    // Logout explicito do Clerk. O redirecionamento evita ficar parado em uma pagina protegida com sessao antiga.
-    setSigningOut(true);
-    setGlobalError(null);
-    try {
-      await signOut({ redirectUrl: '/sign-in' });
-    } catch {
-      window.location.assign('/sign-in');
-    }
-  }
+  const hasExistingBusiness = Boolean(unidade?.cnpj);
+  const resultStep = hasExistingBusiness ? 5 : 4;
+  const hasMarketScope = businessActivityDescription.trim().length >= 3;
+  const hasManualAddress = manualAddress.trim().length >= 5 && manualCity.trim().length >= 2 && manualUf.trim().length >= 2;
+  const hasManualCep = normalizeCep(manualCep).length === 8;
+  const hasLocation = hasExistingBusiness || hasManualCep || hasManualAddress;
+  const canAnalyze = hasMarketScope && hasLocation && competitorTypes.length > 0 && !loadingAnalysis;
 
   async function deleteTemporaryBlob(blob: UploadedBlob | null) {
-    // A planilha ja foi lida no navegador. Depois da analise, este helper pede ao servidor para apagar o blob temporario.
     if (!blob) return false;
     try {
       const response = await fetch('/api/blob/delete', {
         method: 'POST',
-        credentials: 'include',
-        headers: await jsonAuthHeaders(),
+        headers: jsonHeaders(),
         body: JSON.stringify({ blobName: blob.blobName })
       });
       return response.ok;
@@ -221,22 +238,38 @@ export function MarketIntelligenceApp() {
   }
 
   async function handleCnpjLookup() {
-    // Esta funcao chama nossa API de CNPJ.
-    // Se der certo, guardamos os dados da empresa; se der erro, mostramos uma mensagem amigavel.
     setLoadingCnpj(true);
     setGlobalError(null);
-    setUnidade(null);
-    setBusinessActivityDescription('');
     try {
-      const response = await fetch('/api/cnpj', { method: 'POST', credentials: 'include', headers: await jsonAuthHeaders(), body: JSON.stringify({ cnpj }) });
+      const response = await fetch('/api/cnpj', {
+        method: 'POST',
+        headers: jsonHeaders(),
+        body: JSON.stringify({ cnpj })
+      });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Erro ao consultar CNPJ.');
-      setUnidade(json.unidade);
+      const found = json.unidade as UnidadeNegocio;
+      setUnidade(found);
+      setBusinessName(found.nomeFantasia || found.razaoSocial || businessName);
+      if (!businessActivityDescription.trim() && found.cnaePrincipalDescricao) {
+        setBusinessActivityDescription(found.cnaePrincipalDescricao);
+      }
     } catch (error) {
-      await handleUnauthorized(error, 'Erro ao consultar CNPJ.');
+      setGlobalError(error instanceof Error ? error.message : 'Erro ao consultar CNPJ.');
     } finally {
       setLoadingCnpj(false);
     }
+  }
+
+  async function clearExistingBusiness() {
+    setUnidade(null);
+    setCnpj('');
+    setCeps([]);
+    setErrors([]);
+    setSensitiveWarning(false);
+    if (uploadedBlob) await deleteTemporaryBlob(uploadedBlob);
+    setUploadedBlob(null);
+    setBlobWarning(null);
   }
 
   function toggleCompetitorType(type: CompetitorType) {
@@ -252,9 +285,7 @@ export function MarketIntelligenceApp() {
   }
 
   async function handleFile(file: File | null) {
-    // O arquivo e processado no navegador para extrair somente CEPs.
-    // Depois tentamos subir o arquivo para o Azure Blob, mas a analise continua mesmo se esse upload falhar.
-    if (!file) return;
+    if (!file || !hasExistingBusiness) return;
     if (uploadedBlob) {
       await deleteTemporaryBlob(uploadedBlob);
       setUploadedBlob(null);
@@ -266,237 +297,360 @@ export function MarketIntelligenceApp() {
     setErrors(parsed.errors);
     setSensitiveWarning(parsed.sensitiveWarning);
     if (parsed.ceps.length) {
-      setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s) no navegador. O upload da planilha é opcional; se o armazenamento temporário falhar, a análise continua usando estes CEPs.`);
+      setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s). A analise usara apenas esses CEPs, sem nomes, telefones ou e-mails.`);
     }
 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const upload = await fetch('/api/blob/upload', { method: 'POST', credentials: 'include', headers: await bearerAuthHeaders(), body: formData });
+      const upload = await fetch('/api/blob/upload', { method: 'POST', headers: requestHeaders(), body: formData });
       const data = await upload.json() as { error?: string; blobName?: string };
-      if (!upload.ok || !data.blobName) throw new Error(data.error || 'Não foi possível enviar o arquivo temporário.');
+      if (!upload.ok || !data.blobName) throw new Error(data.error || 'Nao foi possivel enviar o arquivo temporario.');
       setUploadedBlob({ blobName: data.blobName });
-      if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s) e arquivo temporário enviado com sucesso. A análise usará apenas os CEPs extraídos.`);
-    } catch (error) {
+      if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s). O arquivo temporario sera apagado depois da analise.`);
+    } catch {
       if (parsed.ceps.length) {
-        setBlobWarning('CEPs lidos com sucesso. O upload temporário ao Azure Blob não foi concluído, mas isso não impede a análise porque os CEPs já foram processados no navegador.');
+        setBlobWarning('CEPs lidos com sucesso. O upload temporario ao Azure Blob nao foi concluido, mas a analise pode continuar porque os CEPs ja foram processados no navegador.');
       } else {
-        setBlobWarning('O upload temporário não foi concluído. Verifique se o arquivo tem uma coluna chamada CEP e tente novamente; se a prévia de CEPs aparecer, a análise pode continuar.');
+        setBlobWarning('O upload temporario nao foi concluido. Verifique se o arquivo tem uma coluna chamada CEP e tente novamente.');
       }
     }
   }
 
   async function startAnalysis() {
-    // Aqui juntamos CNPJ, ramo informado, tipos de concorrentes, raio e CEPs opcionais.
-    // O servidor recebe esse pacote e devolve o relatorio completo.
-    if (!unidade) return;
     const radiusKm = clampAnalysisRadius(analysisRadiusKm);
+    const unitForAnalysis = unidade || makeManualUnit({
+      businessName,
+      businessActivityDescription,
+      manualCep,
+      manualAddress,
+      manualNumber,
+      manualNeighborhood,
+      manualCity,
+      manualUf
+    });
+
     setAnalysisRadiusKm(radiusKm);
     setLoadingAnalysis(true);
     setGlobalError(null);
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        credentials: 'include',
-        headers: await jsonAuthHeaders(),
-        body: JSON.stringify({ unidade, ceps: uniqueCeps, businessActivityDescription, competitorTypes, analysisRadiusKm: radiusKm })
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          unidade: unitForAnalysis,
+          ceps: hasExistingBusiness ? uniqueCeps : [],
+          businessActivityDescription,
+          competitorTypes,
+          analysisRadiusKm: radiusKm
+        })
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
+      if (!response.ok) throw new Error(json.error || 'Erro ao processar analise.');
       setResult(json.result);
       if (uploadedBlob) {
         const deleted = await deleteTemporaryBlob(uploadedBlob);
         setUploadedBlob(null);
         setBlobWarning(deleted
-          ? 'Análise concluída e arquivo temporário apagado do Azure Blob Storage.'
-          : 'Análise concluída. Não foi possível confirmar a exclusão do arquivo temporário; verifique as permissões do Azure Blob Storage.');
+          ? 'Analise concluida e arquivo temporario apagado do Azure Blob Storage.'
+          : 'Analise concluida. Nao foi possivel confirmar a exclusao do arquivo temporario; verifique as permissoes do Azure Blob Storage.');
       }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      await handleUnauthorized(error, 'Erro ao processar análise.');
+      setGlobalError(error instanceof Error ? error.message : 'Erro ao processar analise.');
     } finally {
       setLoadingAnalysis(false);
     }
   }
 
-  if (!isLoaded || (isLoaded && !isSignedIn)) {
+  if (result) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-        <Card className="max-w-md text-center">
-          <Loader2 className="mx-auto h-6 w-6 animate-spin text-orange-600" />
-          <p className="mt-4 text-sm font-semibold text-slate-700">Verificando sua sessão...</p>
-        </Card>
+      <main className="min-h-screen bg-slate-100">
+        <Header />
+        <div className="mx-auto max-w-5xl px-4 py-8 md:px-8">
+          <div className="no-print mb-5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setResult(null)}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Nova analise
+            </button>
+          </div>
+          <Dashboard result={result} />
+        </div>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-8">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligência de Mercado</p>
-            <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Análise regional de concorrência</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-slate-500 md:inline">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</span>
-            <UserButton />
-            <button onClick={handleSignOut} disabled={signingOut} className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-              {signingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
-
+      <Header />
       <div className="mx-auto max-w-5xl px-4 py-8 md:px-8">
+        <CourseReferences />
+
         <Card className="mb-6 border-orange-200 bg-orange-50">
           <div className="flex gap-3">
             <ShieldCheck className="mt-1 h-5 w-5 flex-none text-orange-600" />
             <div>
               <h2 className="font-semibold text-slate-900">Aviso LGPD</h2>
-              <p className="mt-1 text-sm text-slate-700">Os dados do arquivo enviado são processados temporariamente apenas para fins de análise. Apenas CEPs são usados; nomes, telefones, e-mails e outros dados pessoais são ignorados.</p>
+              <p className="mt-1 text-sm text-slate-700">
+                A ferramenta usa apenas os dados necessarios para gerar a analise. CNPJ e endereco ajudam a localizar a regiao; CEPs de clientes, quando enviados, sao opcionais e processados sem nomes, telefones ou e-mails.
+              </p>
             </div>
           </div>
         </Card>
 
-        {globalError && <Card className="mb-6 border-red-200 bg-red-50 text-red-800"><div className="flex gap-3"><AlertTriangle className="h-5 w-5" /><p>{globalError}</p></div></Card>}
+        {globalError && (
+          <Card className="mb-6 border-red-200 bg-red-50 text-red-800">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5" />
+              <p>{globalError}</p>
+            </div>
+          </Card>
+        )}
 
-        {!result ? (
-          <section className="space-y-6">
-            <Card>
-              <Badge className="bg-slate-100 text-slate-600">1 — CNPJ da Empresa</Badge>
-              <h2 className="mt-4 text-2xl font-bold text-slate-900">Informe o CNPJ da empresa</h2>
-              <p className="mt-2 text-sm text-slate-500">Carregue os dados da empresa antes de continuar. O sistema consulta bases públicas para identificar endereço e CEP, que servem como ponto central do raio de análise.</p>
-              <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
+        <section className="space-y-6">
+          <Card>
+            <Badge className="bg-slate-100 text-slate-600">1 — Negocio e regiao</Badge>
+            <h2 className="mt-4 text-2xl font-bold text-slate-900">Que negocio voce quer analisar?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Voce pode analisar uma empresa existente ou estudar a abertura de um novo negocio. O campo mais importante e o ramo de atividade: farmácia, padaria, restaurante, curso de tecnologia, clinica, loja de roupas etc.
+            </p>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm font-semibold text-slate-800" htmlFor="business-name">Nome do negocio <span className="text-slate-400">(opcional)</span></label>
+                <Input id="business-name" value={businessName} onChange={(event) => setBusinessName(event.target.value)} placeholder="Ex: Padaria do Bairro" />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-800" htmlFor="manual-cep">CEP ou endereco de referencia</label>
+                <Input id="manual-cep" value={manualCep} onChange={(event) => setManualCep(event.target.value)} placeholder="Ex: 22775-003" />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atividade <span className="text-orange-600">(obrigatorio)</span></label>
+              <textarea
+                id="business-activity-description"
+                value={businessActivityDescription}
+                onChange={(event) => setBusinessActivityDescription(event.target.value.slice(0, 300))}
+                placeholder="Ex: restaurante italiano de bairro com foco em almoço executivo e delivery"
+                className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+              />
+              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                <span>Quanto mais especifico, mais coerente sera a busca por concorrentes.</span>
+                <span>{businessActivityDescription.length}/300</span>
+              </div>
+            </div>
+
+            {!hasExistingBusiness && (
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <MapPin className="h-4 w-4 text-orange-600" />
+                  Localizacao do estudo
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  Se voce informou um CEP valido, o endereco completo e opcional. Se preferir, preencha cidade, UF e endereco de referencia.
+                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-[2fr_1fr]">
+                  <Input value={manualAddress} onChange={(event) => setManualAddress(event.target.value)} placeholder="Rua, avenida ou ponto de referencia" />
+                  <Input value={manualNumber} onChange={(event) => setManualNumber(event.target.value)} placeholder="Numero" />
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-[1.5fr_1.5fr_0.7fr]">
+                  <Input value={manualNeighborhood} onChange={(event) => setManualNeighborhood(event.target.value)} placeholder="Bairro" />
+                  <Input value={manualCity} onChange={(event) => setManualCity(event.target.value)} placeholder="Cidade" />
+                  <Input value={manualUf} onChange={(event) => setManualUf(event.target.value.toUpperCase().slice(0, 2))} placeholder="UF" />
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 p-4">
+              <p className="text-sm font-semibold text-slate-800">Ja tem CNPJ? Use como atalho opcional.</p>
+              <p className="mt-1 text-sm text-slate-500">O CNPJ preenche dados da empresa e libera o upload opcional de CEPs de clientes.</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
                 <Input value={cnpj} onChange={(event) => setCnpj(event.target.value)} placeholder="CNPJ — ex: 12.345.678/0001-90" />
-                <Button className="whitespace-normal text-center md:whitespace-nowrap" onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>{loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />} Carregar dados da minha empresa</Button>
+                <Button className="whitespace-normal text-center md:whitespace-nowrap" onClick={handleCnpjLookup} disabled={loadingCnpj || cnpj.replace(/\D/g, '').length < 14}>
+                  {loadingCnpj ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
+                  Consultar CNPJ
+                </Button>
               </div>
 
               {unidade && (
                 <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-slate-800">
-                  <div className="mb-3 flex items-center gap-2 font-semibold text-emerald-700"><CheckCircle2 className="h-5 w-5" /> Empresa encontrada</div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 font-semibold text-emerald-700">
+                      <CheckCircle2 className="h-5 w-5" />
+                      Empresa encontrada
+                    </div>
+                    <button type="button" onClick={clearExistingBusiness} className="inline-flex items-center rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50">
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      Remover CNPJ
+                    </button>
+                  </div>
                   <div className="grid gap-2 md:grid-cols-2">
-                    <p><strong>Razão Social:</strong> {unidade.razaoSocial}</p>
-                    <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Não informado'}</p>
+                    <p><strong>Razao Social:</strong> {unidade.razaoSocial}</p>
+                    <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Nao informado'}</p>
                     <p><strong>CNPJ:</strong> {formatCnpj(unidade.cnpj)}</p>
-                    <p><strong>Situação:</strong> {unidade.situacaoCadastral}</p>
-                    <p><strong>CEP detectado via CNPJ:</strong> {formatCep(unidade.cep)}</p>
-                    <p className="md:col-span-2"><strong>Endereço:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
+                    <p><strong>Situacao:</strong> {unidade.situacaoCadastral}</p>
+                    <p><strong>CEP:</strong> {formatCep(unidade.cep)}</p>
+                    <p className="md:col-span-2"><strong>Endereco:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
                   </div>
                 </div>
               )}
-            </Card>
+            </div>
+          </Card>
 
+          <Card>
+            <Badge className="bg-slate-100 text-slate-600">2 — Concorrencia</Badge>
+            <h2 className="mt-4 text-xl font-bold text-slate-900">Quais concorrentes devem entrar na leitura?</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Para vender melhor, a primeira analise pode ficar em <strong>Todos</strong>. Se voce quiser uma leitura mais focada, escolha categorias especificas.
+            </p>
+            {businessActivityDescription.trim() && (
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                A busca vai priorizar concorrentes relacionados a: <strong>{businessActivityDescription.trim()}</strong>.
+              </div>
+            )}
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {competitorOptions.map((option) => (
+                <label key={option.type} className={`flex cursor-pointer gap-3 rounded-2xl border p-3 text-sm hover:bg-slate-50 ${option.suggested ? 'border-orange-200 bg-orange-50/40' : 'border-slate-200'}`}>
+                  <input type="checkbox" checked={competitorTypes.includes(option.type)} onChange={() => toggleCompetitorType(option.type)} className="mt-1 h-4 w-4" />
+                  <span>
+                    <span className="font-semibold text-slate-900">{option.type}</span>
+                    {option.suggested && <Badge className="ml-2 bg-orange-100 text-orange-700">Sugerido</Badge>}
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">{option.reason}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <Badge className="bg-slate-100 text-slate-600">3 — Raio de analise</Badge>
+            <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha ate onde olhar ao redor</h2>
+            <p className="mt-2 text-sm text-slate-500">Comece com 4 km para negocios locais. Aumente se o cliente costuma se deslocar ou se o servico tem alcance regional.</p>
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm font-semibold text-slate-700">Raio em torno da localizacao</span>
+                <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{safeAnalysisRadiusKm} km</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                step={1}
+                value={safeAnalysisRadiusKm}
+                onChange={(event) => setAnalysisRadiusKm(clampAnalysisRadius(Number(event.target.value)))}
+                className="mt-4 w-full accent-orange-500"
+              />
+              <div className="mt-2 flex justify-between text-xs text-slate-500">
+                <span>1 km</span>
+                <span>4 km sugerido</span>
+                <span>20 km</span>
+              </div>
+            </div>
+          </Card>
+
+          {hasExistingBusiness && (
             <Card>
-              <Badge className="bg-slate-100 text-slate-600">2 — Escopo da análise</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Descreva o ramo de atividade que deve ser analisado</h2>
-              <p className="mt-2 text-sm text-slate-500">O CNPJ nem sempre explica o que a empresa realmente vende. Escreva, em linguagem simples, qual oferta deve guiar a busca por concorrentes.</p>
-              {unidade && (
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atividade analisado <span className="text-orange-600">(obrigatório)</span></label>
-                  <p className="mt-1 text-sm text-slate-500">Seja específico sobre a oferta, o público e o contexto. Exemplo: “curso presencial de robótica e programação para crianças e adolescentes”. A análise respeita este texto como escopo principal.</p>
-                  <textarea
-                    id="business-activity-description"
-                    value={businessActivityDescription}
-                    onChange={(event) => setBusinessActivityDescription(event.target.value.slice(0, 300))}
-                    placeholder="Descreva em uma frase o que a empresa oferece, para quem e como compete..."
-                    className="mt-3 min-h-28 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                    <span>Este texto define quais concorrentes fazem sentido para a análise.</span>
-                    <span>{businessActivityDescription.length}/300</span>
+              <Badge className="bg-slate-100 text-slate-600">4 — Clientes atuais</Badge>
+              <h2 className="mt-4 text-xl font-bold text-slate-900">CEPs de clientes <span className="text-slate-400">(opcional)</span></h2>
+              <>
+                <p className="mt-2 text-sm text-slate-500">
+                  Como voce informou um CNPJ, pode enviar CEPs de clientes atuais para entender onde sua base real aparece. Se nao tiver planilha, pule esta etapa.
+                </p>
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p><strong>Formato aceito:</strong> uma coluna chamada <code className="rounded bg-white px-1 py-0.5">cep</code>. Pode usar <code className="rounded bg-white px-1 py-0.5">22775003</code>, <code className="rounded bg-white px-1 py-0.5">22775-003</code> ou <code className="rounded bg-white px-1 py-0.5">22.775-003</code>.</p>
+                  <a href="/modelo-ceps-clientes.csv" download className="mt-4 inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <Download className="mr-2 h-4 w-4" />
+                    Baixar modelo CSV de CEPs
+                  </a>
+                </div>
+                <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-orange-400 hover:bg-orange-50">
+                  <FileSpreadsheet className="h-10 w-10 text-orange-500" />
+                  <span className="mt-3 font-semibold text-slate-800">Selecionar arquivo CSV/XLSX de CEPs</span>
+                  <span className="mt-1 text-sm text-slate-500">Apenas a coluna CEP sera processada. Limite de 50MB.</span>
+                  <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(event) => handleFile(event.target.files?.[0] || null)} />
+                </label>
+                {sensitiveWarning && <p className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm text-yellow-800">Foram identificadas colunas desnecessarias. Apenas os CEPs serao processados.</p>}
+                {blobWarning && <p className="mt-4 rounded-2xl bg-blue-50 p-3 text-sm text-blue-800">{blobWarning}</p>}
+                {errors.length > 0 && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{errors.slice(0, 5).map((error) => <p key={error}>{error}</p>)}</div>}
+                {uniqueCeps.length > 0 && (
+                  <div className="mt-5">
+                    <h3 className="font-semibold text-slate-900">Pre-visualizacao dos CEPs</h3>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {uniqueCeps.slice(0, 40).map((cep) => <Badge key={cep} className="bg-slate-100 text-slate-700">{formatCep(cep)}</Badge>)}
+                      {uniqueCeps.length > 40 && <Badge className="bg-slate-100 text-slate-700">+{uniqueCeps.length - 40}</Badge>}
+                    </div>
                   </div>
-                </div>
-              )}
-              {!unidade && <p className="mt-4 text-sm text-slate-500">Carregue os dados da empresa pelo CNPJ para continuar.</p>}
+                )}
+              </>
             </Card>
+          )}
 
-            <Card>
-              <Badge className="bg-slate-100 text-slate-600">3 — Tipos de concorrentes</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Tipos de concorrentes que devem entrar na busca</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                A ferramenta usa o ramo informado para destacar categorias prováveis. Mantenha <strong>Todos</strong> marcado para uma primeira análise ampla, ou escolha categorias específicas para reduzir o foco.
+          <Card className="border-orange-200">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <Badge className="bg-orange-100 text-orange-700">{resultStep} — Resultado</Badge>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900">Gerar analise simplificada</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  A ferramenta vai analisar {businessActivityDescription.trim() || 'o ramo informado'} em um raio de {safeAnalysisRadiusKm} km, usando {hasExistingBusiness ? 'o endereco do CNPJ' : 'a localizacao informada'}.
+                </p>
+              </div>
+              <Button className="min-w-52" onClick={startAnalysis} disabled={!canAnalyze}>
+                {loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
+                Analisar regiao
+              </Button>
+            </div>
+            {!canAnalyze && (
+              <p className="mt-4 text-sm text-slate-500">
+                Para iniciar, informe o ramo de atividade, uma localizacao por CEP ou endereco, e mantenha pelo menos um tipo de concorrente selecionado.
               </p>
-              {unidade ? (
-                <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm text-blue-900">
-                  Sugestões baseadas no ramo informado: {businessActivityDescription.trim() || 'descreva o ramo na etapa anterior para receber sugestões melhores'}.
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-slate-500">Carregue o CNPJ e descreva o ramo para receber sugestões de concorrentes.</p>
-              )}
-              {businessActivityDescription.trim() && (
-                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                  A análise vai procurar concorrentes, alternativas e locais relacionados a “{businessActivityDescription.trim()}”.
-                </div>
-              )}
-              <div className="mt-4 grid gap-2 md:grid-cols-2">
-                {competitorOptions.map((option) => <label key={option.type} className={`flex cursor-pointer gap-3 rounded-2xl border p-3 text-sm hover:bg-slate-50 ${option.suggested ? 'border-orange-200 bg-orange-50/40' : 'border-slate-200'}`}><input type="checkbox" checked={competitorTypes.includes(option.type)} onChange={() => toggleCompetitorType(option.type)} className="mt-1 h-4 w-4" /><span><span className="font-semibold text-slate-900">{option.type}</span>{option.suggested && <Badge className="ml-2 bg-orange-100 text-orange-700">Sugerido</Badge>}<span className="mt-1 block text-xs leading-5 text-slate-500">{option.reason}</span></span></label>)}
-              </div>
-            </Card>
-
-            <Card>
-              <Badge className="bg-slate-100 text-slate-600">4 — Região e clientes atuais</Badge>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">Defina o raio de análise e, opcionalmente, envie CEPs de clientes</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                A planilha de CEPs é opcional. Se você não tiver uma lista de clientes, deixe essa parte em branco: a ferramenta ainda analisa a região em torno da empresa usando o raio informado.
-              </p>
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <label className="text-sm font-semibold text-slate-700" htmlFor="analysis-radius">Raio de análise em torno da empresa</label>
-                  <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{safeAnalysisRadiusKm} km</span>
-                </div>
-                <input
-                  id="analysis-radius"
-                  type="range"
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={safeAnalysisRadiusKm}
-                  onChange={(event) => setAnalysisRadiusKm(clampAnalysisRadius(Number(event.target.value)))}
-                  className="mt-4 w-full accent-orange-500"
-                />
-                <div className="mt-2 flex justify-between text-xs text-slate-500">
-                  <span>1 km</span>
-                  <span>4 km sugerido</span>
-                  <span>20 km máximo</span>
-                </div>
-                <p className="mt-3 text-xs text-slate-500">Use raios menores para análise de bairro e raios maiores quando o cliente aceita se deslocar mais ou quando o serviço tem alcance regional.</p>
-              </div>
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <p><strong>Formato aceito:</strong> uma coluna chamada <code className="rounded bg-white px-1 py-0.5">cep</code>. O CEP pode estar como <code className="rounded bg-white px-1 py-0.5">22775003</code>, <code className="rounded bg-white px-1 py-0.5">22775-003</code> ou <code className="rounded bg-white px-1 py-0.5">22.775-003</code>; a ferramenta usa apenas os 8 números.</p>
-                <p className="mt-2">Não envie nomes, telefones, e-mails ou outros dados pessoais. Se essas colunas existirem, serão ignoradas.</p>
-                <a href="/modelo-ceps-clientes.csv" download className="mt-4 inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
-                  <Download className="mr-2 h-4 w-4" /> Baixar modelo CSV de CEPs
-                </a>
-              </div>
-              <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-orange-400 hover:bg-orange-50">
-                <FileSpreadsheet className="h-10 w-10 text-orange-500" />
-                <span className="mt-3 font-semibold text-slate-800">Selecionar arquivo CSV/XLSX de CEPs, opcional</span>
-                <span className="mt-1 text-sm text-slate-500">Use o modelo CSV para começar rápido. Limite de 50MB. Apenas a coluna CEP será processada; a análise funciona mesmo sem arquivo.</span>
-                <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(event) => handleFile(event.target.files?.[0] || null)} />
-              </label>
-              {sensitiveWarning && <p className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm text-yellow-800">Foram identificadas colunas que não são necessárias para esta análise. Apenas os CEPs serão processados.</p>}
-              {blobWarning && <p className="mt-4 rounded-2xl bg-blue-50 p-3 text-sm text-blue-800">{blobWarning}</p>}
-              {errors.length > 0 && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{errors.slice(0, 5).map((error) => <p key={error}>{error}</p>)}</div>}
-              {uniqueCeps.length > 0 && <div className="mt-5"><h3 className="font-semibold text-slate-900">Pré-visualização dos CEPs</h3><div className="mt-3 flex flex-wrap gap-2">{uniqueCeps.slice(0, 40).map((cep) => <Badge key={cep} className="bg-slate-100 text-slate-700">{formatCep(cep)}</Badge>)}{uniqueCeps.length > 40 && <Badge className="bg-slate-100 text-slate-700">+{uniqueCeps.length - 40}</Badge>}</div></div>}
-            </Card>
-
-            <Card className="border-orange-200 bg-white">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <Badge className="bg-orange-100 text-orange-700">5 — Iniciar</Badge>
-                  <h2 className="mt-3 text-2xl font-bold text-slate-900">Iniciar análise da região</h2>
-                  <p className="mt-2 text-sm text-slate-500">A análise usará o CNPJ carregado da empresa, o ramo de atividade informado, os tipos de concorrentes, o raio de {safeAnalysisRadiusKm} km e os CEPs de clientes, se enviados.</p>
-                </div>
-                <Button className="min-w-56" onClick={startAnalysis} disabled={!canAnalyze}>{loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />} Iniciar análise</Button>
-              </div>
-              {!canAnalyze && <p className="mt-4 text-sm text-slate-500">Para iniciar, carregue os dados da empresa, descreva o ramo de atividade e mantenha pelo menos um tipo de concorrente selecionado.</p>}
-            </Card>
-          </section>
-        ) : (
-          <Dashboard result={result} />
-        )}
+            )}
+          </Card>
+        </section>
       </div>
     </main>
+  );
+}
+
+function Header() {
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-8">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligencia de Mercado</p>
+          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Analise regional simplificada</h1>
+        </div>
+        <a href="https://www.myrobotbarra.com.br/" target="_blank" rel="noreferrer" className="hidden text-sm font-semibold text-slate-600 hover:text-orange-600 md:inline">
+          My Robot Barra da Tijuca
+        </a>
+      </div>
+    </header>
+  );
+}
+
+function CourseReferences() {
+  return (
+    <Card className="mb-6">
+      <div className="grid gap-5 md:grid-cols-[1.2fr_1fr] md:items-center">
+        <div>
+          <Badge className="bg-orange-100 text-orange-700">Projeto educacional aplicado</Badge>
+          <h2 className="mt-3 text-2xl font-bold text-slate-900">Ferramenta criada para praticar IA, dados e desenvolvimento de apps</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Esta aplicacao demonstra, em formato simples, conceitos ensinados nos cursos de Inteligencia Artificial e App Developer da My Robot Barra da Tijuca.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {COURSE_REFERENCES.map((course) => (
+            <a key={course.title} href={course.href} target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center transition hover:border-orange-300 hover:bg-orange-50">
+              <img src={course.logo} alt={course.title} className="mx-auto h-14 max-w-full object-contain" />
+              <span className="mt-3 block text-sm font-bold text-slate-800">{course.title}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </Card>
   );
 }

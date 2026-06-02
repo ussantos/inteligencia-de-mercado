@@ -1,12 +1,11 @@
-// Esta API lista as analises antigas do usuario logado.
-// Cada usuario so ve o proprio historico, porque filtramos pelo userId do Clerk.
+// Esta API lista analises antigas do visitante anonimo.
+// Sem login, o historico e separado por um identificador local enviado pelo navegador.
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { anonymousUserId } from '@/lib/visitor';
 
-export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+export async function GET(request: Request) {
+  const userId = anonymousUserId(request);
 
   const history = await prisma.analysisHistory.findMany({
     where: { userId },

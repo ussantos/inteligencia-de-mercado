@@ -1,13 +1,9 @@
 // Esta API recebe a planilha do navegador e envia para o Azure Blob Storage pelo servidor.
 // Isso evita erro de CORS, porque quem conversa com o Azure Storage e a API Next.js, nao o navegador.
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { uploadTemporaryBlob } from '@/services/blob';
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-
   try {
     const formData = await request.formData();
     const file = formData.get('file');

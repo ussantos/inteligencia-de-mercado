@@ -5,7 +5,6 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
-import { useAuth, useClerk } from '@clerk/nextjs';
 import { Download, FileDown, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import type { AnalysisResult, BusinessModelCanvas } from '@/lib/types';
@@ -31,10 +30,17 @@ function businessModelCanvasRows(result: AnalysisResult) {
   });
 }
 
-export function ExportButtons({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
-  const { getToken } = useAuth();
-  const { signOut } = useClerk();
+function visitorId() {
+  if (typeof window === 'undefined') return 'server';
+  const key = 'market-intelligence-visitor-id';
+  const existing = window.localStorage.getItem(key);
+  if (existing) return existing;
+  const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  window.localStorage.setItem(key, id);
+  return id;
+}
 
+export function ExportButtons({ result, readOnly = false }: { result: AnalysisResult; readOnly?: boolean }) {
   async function exportPdf() {
     // O PDF e criado tirando uma "foto" da area do relatorio e colocando essa imagem em uma pagina A4.
     const element = document.getElementById('analysis-report-screen') || document.getElementById('analysis-report');
@@ -67,23 +73,15 @@ export function ExportButtons({ result, readOnly = false }: { result: AnalysisRe
     // Compartilhar cria um link salvo no banco.
     // Depois copiamos esse link para a area de transferencia do usuario.
     if (!result.id) return;
-    const token = await getToken();
-    if (!token) {
-      await signOut({ redirectUrl: '/sign-in' });
-      return;
-    }
     const response = await fetch('/api/share', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', 'x-visitor-id': visitorId() },
       body: JSON.stringify({ analysisId: result.id })
     });
     const json = await response.json();
     if (json.url) {
       await navigator.clipboard.writeText(`${window.location.origin}${json.url}`);
       alert('Link compartilhável copiado para a área de transferência.');
-    } else if (response.status === 401) {
-      await signOut({ redirectUrl: '/sign-in' });
     }
   }
 

@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeCep, isValidCep } from '@/lib/cep';
 import { clamp } from '@/lib/utils';
 import { getDistance } from '@/services/distance';
-import { geocodeCep } from '@/services/geocode';
+import { geocodeAddress, geocodeCep } from '@/services/geocode';
 import { getStrategicPlaces } from '@/services/google-places';
 import { enhanceWithOpenAI } from '@/services/ai';
 import { DEFAULT_COMPETITOR_TYPES, type CompetitorType } from '@/lib/competitor-types';
@@ -290,6 +290,22 @@ function buildPersonas(unidade: UnidadeNegocio, topBairro: string, analysisSegme
   ];
 }
 
+async function resolveUnitGeo(unidade: UnidadeNegocio) {
+  // Quando a pessoa informou CNPJ, o CEP costuma ser suficiente.
+  // Quando ela esta apenas estudando um novo negocio, usamos o endereco digitado manualmente.
+  const cepGeo = await geocodeCep(unidade.cep);
+  if (cepGeo) return cepGeo;
+
+  const address = [unidade.logradouro, unidade.numero, unidade.bairro, unidade.municipio, unidade.uf].filter(Boolean).join(', ');
+  return geocodeAddress({
+    address,
+    cep: unidade.cep,
+    bairro: unidade.bairro,
+    cidade: unidade.municipio,
+    uf: unidade.uf
+  });
+}
+
 function buildSmartRecommendations(input: {
   unitName: string;
   topBairro: string;
@@ -436,8 +452,8 @@ export async function runMarketAnalysis(input: {
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
   const domain = `Ramo informado: ${businessActivityDescription}`;
 
-  const unitGeo = await geocodeCep(input.unidade.cep);
-  if (!unitGeo) throw new Error('Não foi possível geocodificar o CEP da empresa obtido pelo CNPJ.');
+  const unitGeo = await resolveUnitGeo(input.unidade);
+  if (!unitGeo) throw new Error('Não foi possível localizar o endereço informado. Revise CEP, bairro, cidade e UF.');
 
   const points: CepPoint[] = [];
   for (const cep of validCeps.slice(0, 500)) {
@@ -598,8 +614,8 @@ export async function runMarketAnalysis(input: {
   const saved = await prisma.analysis.create({
     data: {
       userId: input.userId,
-      businessUnitCep: input.unidade.cep,
-      businessUnitCnpj: input.unidade.cnpj,
+      businessUnitCep: input.unidade.cep || unitGeo.cep,
+      businessUnitCnpj: input.unidade.cnpj || undefined,
       domain,
       reportJson: finalResult as any,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -609,10 +625,10 @@ export async function runMarketAnalysis(input: {
   await prisma.analysisHistory.create({
     data: {
       userId: input.userId,
-      businessUnitCnpj: input.unidade.cnpj,
-      businessUnitCep: input.unidade.cep,
+      businessUnitCnpj: input.unidade.cnpj || 'sem-cnpj',
+      businessUnitCep: input.unidade.cep || unitGeo.cep,
       businessUnitName: input.unidade.nomeFantasia || input.unidade.razaoSocial,
-      businessUnitCnae: input.unidade.cnaePrincipalCodigo,
+      businessUnitCnae: input.unidade.cnaePrincipalCodigo || 'sem-cnae',
       domain,
       cepCount: points.length,
       opportunityIndex: result.estatisticas.indiceOportunidadeMercado,

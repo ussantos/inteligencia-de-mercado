@@ -5,6 +5,7 @@ import { normalizeCep } from '@/lib/cep';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { getViaCep } from '@/services/viacep';
 import { assertMonthlyBudget } from '@/services/usage-budget';
+import { slugify } from '@/lib/utils';
 
 export interface GeoResult {
   cep: string;
@@ -35,29 +36,7 @@ function buildAddress(parts: { logradouro?: string; bairro?: string; localidade?
   return [parts.logradouro, parts.bairro, parts.localidade, parts.uf, parts.cep, 'Brasil'].filter(Boolean).join(', ');
 }
 
-export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
-  // Esta funcao recebe um CEP, limpa o texto, procura no cache e, se precisar, chama APIs externas.
-  const cep = normalizeCep(cepInput);
-  if (cep.length !== 8) return null;
-
-  const cached = await prisma.cepGeocodeCache.findUnique({ where: { cep } });
-  if (cached) {
-    return {
-      cep,
-      lat: cached.lat,
-      lng: cached.lng,
-      address: cached.address,
-      bairro: cached.bairro || '',
-      cidade: cached.cidade || '',
-      uf: cached.uf || '',
-      source: cached.source
-    };
-  }
-
-  const viaCep = await getViaCep(cep);
-  if (!viaCep) return null;
-
-  const address = buildAddress(viaCep);
+async function geocodeTextAddress(address: string) {
   const locationIqKey = process.env.LOCATIONIQ_API_KEY;
   const locationIqUrl = locationIqKey
     ? `https://us1.locationiq.com/v1/search?key=${encodeURIComponent(locationIqKey)}&q=${encodeURIComponent(address)}&format=json&limit=1`
@@ -101,33 +80,89 @@ export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
         }
       }
     } catch {
-      // Se o geocodificador publico falhar, retornamos null para a analise explicar a falta de coordenadas.
+      // Se o geocodificador publico falhar, retornamos null.
     }
   }
 
   if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return null;
+  return { lat, lng, source };
+}
+
+export async function geocodeAddress(input: {
+  address: string;
+  cep?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+}): Promise<GeoResult | null> {
+  // Usado quando o usuario ainda nao tem CNPJ.
+  // Recebe um endereco digitado e tenta achar coordenadas para iniciar a analise regional.
+  const address = [input.address, input.bairro, input.cidade, input.uf, 'Brasil'].filter(Boolean).join(', ');
+  if (address.replace(/Brasil|,/gi, '').trim().length < 5) return null;
+
+  const geocoded = await geocodeTextAddress(address);
+  if (!geocoded) return null;
+
+  const normalizedCep = normalizeCep(input.cep || '');
+  return {
+    cep: normalizedCep || `manual-${slugify(address).slice(0, 64)}`,
+    lat: geocoded.lat,
+    lng: geocoded.lng,
+    address,
+    bairro: input.bairro || '',
+    cidade: input.cidade || '',
+    uf: input.uf || '',
+    source: geocoded.source
+  };
+}
+
+export async function geocodeCep(cepInput: string): Promise<GeoResult | null> {
+  // Esta funcao recebe um CEP, limpa o texto, procura no cache e, se precisar, chama APIs externas.
+  const cep = normalizeCep(cepInput);
+  if (cep.length !== 8) return null;
+
+  const cached = await prisma.cepGeocodeCache.findUnique({ where: { cep } });
+  if (cached) {
+    return {
+      cep,
+      lat: cached.lat,
+      lng: cached.lng,
+      address: cached.address,
+      bairro: cached.bairro || '',
+      cidade: cached.cidade || '',
+      uf: cached.uf || '',
+      source: cached.source
+    };
+  }
+
+  const viaCep = await getViaCep(cep);
+  if (!viaCep) return null;
+
+  const address = buildAddress(viaCep);
+  const geocoded = await geocodeTextAddress(address);
+  if (!geocoded) return null;
 
   await prisma.cepGeocodeCache.create({
     data: {
       cep,
-      lat,
-      lng,
+      lat: geocoded.lat,
+      lng: geocoded.lng,
       address,
       bairro: viaCep.bairro,
       cidade: viaCep.localidade,
       uf: viaCep.uf,
-      source
+      source: geocoded.source
     }
   });
 
   return {
     cep,
-    lat,
-    lng,
+    lat: geocoded.lat,
+    lng: geocoded.lng,
     address,
     bairro: viaCep.bairro,
     cidade: viaCep.localidade,
     uf: viaCep.uf,
-    source
+    source: geocoded.source
   };
 }

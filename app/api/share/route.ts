@@ -1,13 +1,11 @@
 // Esta API cria um link de compartilhamento para uma analise ja salva.
 // O link ganha um codigo aleatorio e uma data de vencimento, para nao ficar publico para sempre.
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { anonymousUserId } from '@/lib/visitor';
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+  const userId = anonymousUserId(request);
 
   try {
     const { analysisId } = await request.json();
@@ -23,7 +21,7 @@ export async function POST(request: Request) {
         uuid: crypto.randomUUID(),
         userId,
         analysisId: analysis.id,
-        reportJson: analysis.reportJson as Prisma.InputJsonValue,
+        reportJson: analysis.reportJson as any,
         expiresAt: new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000)
       }
     });
