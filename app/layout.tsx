@@ -7,6 +7,16 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Inteligência de Mercado',
   description: 'Ferramenta independente de análise regional, concorrência e oportunidade para qualquer tipo de empresa.',
+  icons: {
+    icon: [
+      {
+        url: 'https://www.myrobotbarra.com.br/assets/images/favicon.png',
+        type: 'image/png'
+      }
+    ],
+    shortcut: ['https://www.myrobotbarra.com.br/assets/images/favicon.png'],
+    apple: ['https://www.myrobotbarra.com.br/assets/images/favicon.png']
+  },
   robots: {
     index: false,
     follow: false

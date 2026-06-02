@@ -669,8 +669,18 @@ function Header() {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligencia de Mercado</p>
           <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Analise regional de mercado</h1>
         </div>
-        <a href="https://www.myrobotbarra.com.br/" target="_blank" rel="noreferrer" className="hidden text-sm font-semibold text-slate-600 hover:text-orange-600 md:inline">
-          My Robot Barra da Tijuca
+        <a
+          href="https://www.myrobotbarra.com.br/"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-orange-300 hover:text-orange-600 md:inline-flex"
+        >
+          <img
+            src="https://www.myrobotbarra.com.br/assets/images/logo.webp"
+            alt="My Robot Barra da Tijuca"
+            className="h-8 w-auto object-contain"
+          />
+          <span>My Robot Barra da Tijuca</span>
         </a>
       </div>
     </header>
