@@ -47,7 +47,7 @@ function loadGoogleMaps(apiKey: string) {
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Nao foi possivel carregar o Google Maps.'));
+      script.onerror = () => reject(new Error('Não foi possível carregar o Google Maps.'));
       document.head.appendChild(script);
     });
   }
@@ -135,7 +135,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       .catch(() => {
         if (!cancelled) {
           setStatus('error');
-          setErrorMessage('Nao foi possivel carregar o Google Maps. Verifique a chave publica, a Maps JavaScript API e as restricoes de HTTP referrer.');
+          setErrorMessage('Não foi possível carregar o Google Maps. Verifique a chave pública, a Maps JavaScript API e as restrições de HTTP referrer.');
         }
       });
 
@@ -212,7 +212,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
           icon: markerSymbol(google, color, place.categoriaEstrategica.toLowerCase().includes('barreira') ? 9 : 7)
         });
         marker.addListener('click', () => {
-          const rating = place.rating ? `<br>Avaliacao: ${escapeHtml(place.rating.toFixed(1))} (${escapeHtml(place.userRatingCount || 0)} avaliacoes)` : '';
+          const rating = place.rating ? `<br>Avaliação: ${escapeHtml(place.rating.toFixed(1))} (${escapeHtml(place.userRatingCount || 0)} avaliações)` : '';
           const website = place.website ? `<br><a href="${escapeHtml(place.website)}" target="_blank" rel="noreferrer">Site do local</a>` : '';
           infoWindow.setContent(
             `<strong>${escapeHtml(place.nome)}</strong><br>${escapeHtml(place.categoriaEstrategica)}<br>${escapeHtml(place.subcategoria)}${rating}<br>Distancia: ${escapeHtml(formatKm(place.distanciaKm))}<br>Fonte: ${escapeHtml(place.fonte)}<br>${escapeHtml(place.observacaoEstrategica)}${website}`

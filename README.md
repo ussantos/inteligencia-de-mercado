@@ -12,7 +12,7 @@ Voce pode testar a aplicacao nesta URL: https://gray-glacier-0dc52610f.7.azurest
 
 Este projeto tem carater educativo e demonstra como aplicar conceitos de inteligencia artificial, automacao, desenvolvimento web e analise de dados em uma ferramenta pratica de inteligencia de mercado.
 
-A ferramenta foi criada como projeto aplicado inspirado nos conceitos apresentados nos cursos [Inteligencia Artificial](https://www.myrobotbarra.com.br/inteligencia-artificial.html) e [App Developer](https://www.myrobotbarra.com.br/app-developer.html), da My Robot Barra da Tijuca.
+A ferramenta foi criada como projeto aplicado inspirado nos conceitos apresentados nos cursos [Inteligencia Artificial](https://www.myrobotbarra.com.br/inteligencia-artificial.html), [App Developer](https://www.myrobotbarra.com.br/app-developer.html) e [My Robot Business](https://www.myrobotbarra.com.br/my-robot-business.html), da My Robot Barra da Tijuca.
 
 O codigo-fonte esta disponivel no GitHub em [ussantos/inteligencia-de-mercado](https://github.com/ussantos/inteligencia-de-mercado) sob a licenca [GNU GPL](https://www.gnu.org/licenses/gpl-3.0.html).
 
@@ -63,6 +63,7 @@ A ferramenta transforma dados publicos e dados operacionais simples em um relato
 - `/internal/shared/[uuid]` abre relatorios compartilhados em modo somente leitura.
 - `/api/analyze` executa a analise.
 - `/api/cnpj` consulta dados do CNPJ.
+- `/api/cep` consulta dados basicos de endereco pelo CEP.
 - `/api/history` lista historico do visitante anonimo.
 - `/api/share` gera link compartilhavel.
 - `/api/blob/upload` envia arquivo temporario para o Azure Blob Storage pelo servidor.
@@ -543,7 +544,7 @@ You can test the application at: https://gray-glacier-0dc52610f.7.azurestaticapp
 
 This project is educational and demonstrates how to apply artificial intelligence, automation, web development, and data analysis concepts to a practical market intelligence tool.
 
-The tool was created as an applied project inspired by concepts presented in the [Artificial Intelligence](https://www.myrobotbarra.com.br/inteligencia-artificial.html) and [App Developer](https://www.myrobotbarra.com.br/app-developer.html) courses from My Robot Barra da Tijuca.
+The tool was created as an applied project inspired by concepts presented in the [Artificial Intelligence](https://www.myrobotbarra.com.br/inteligencia-artificial.html), [App Developer](https://www.myrobotbarra.com.br/app-developer.html), and [My Robot Business](https://www.myrobotbarra.com.br/my-robot-business.html) courses from My Robot Barra da Tijuca.
 
 The source code is available on GitHub at [ussantos/inteligencia-de-mercado](https://github.com/ussantos/inteligencia-de-mercado) under the [GNU GPL](https://www.gnu.org/licenses/gpl-3.0.html) license.
 
@@ -594,6 +595,7 @@ The tool transforms public data and simple operational data into a practical mar
 - `/internal/shared/[uuid]` opens shared reports in read-only mode.
 - `/api/analyze` runs the analysis.
 - `/api/cnpj` fetches CNPJ data.
+- `/api/cep` fetches basic address data from a ZIP/postal code.
 - `/api/history` lists the anonymous visitor history.
 - `/api/share` creates a shareable link.
 - `/api/blob/upload` uploads a temporary file to Azure Blob Storage through the server.

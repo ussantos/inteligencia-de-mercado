@@ -6,7 +6,7 @@
 import { AlertTriangle, Building2, CheckCircle2, Download, FileSpreadsheet, Loader2, MapPin, Radar, ShieldCheck, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dashboard } from '@/components/Dashboard';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { normalizeCep, isValidCep, detectCepColumn } from '@/lib/cep';
@@ -36,8 +36,16 @@ const COURSE_REFERENCES = [
     title: 'App Developer',
     href: 'https://www.myrobotbarra.com.br/app-developer.html',
     logo: 'https://www.myrobotbarra.com.br/assets/images/course-logos/appdeveloper.webp'
+  },
+  {
+    title: 'My Robot Business',
+    href: 'https://www.myrobotbarra.com.br/my-robot-business.html',
+    logo: 'https://www.myrobotbarra.com.br/assets/images/course-logos/my-robot-business.webp'
   }
 ];
+
+const FRIENDLY_ERROR_MESSAGE =
+  'Algo não carregou como esperado. Esta aplicação roda com recursos limitados, apenas para testes. Clique em OK para limpar dados temporários deste site, recarregar a página e tentar novamente.';
 
 function visitorId() {
   // O site nao pede login. Este identificador anonimo ajuda o servidor a aplicar rate limit basico.
@@ -56,6 +64,25 @@ function jsonHeaders() {
 
 function requestHeaders() {
   return { 'x-visitor-id': visitorId() };
+}
+
+async function clearSiteCacheAndReload() {
+  try {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+    }
+
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  } finally {
+    window.location.reload();
+  }
 }
 
 function parseRows(rows: Record<string, unknown>[]): ParsedCeps {
@@ -105,7 +132,7 @@ async function parseFile(file: File): Promise<ParsedCeps> {
     return parseRows(rows);
   }
 
-  return { ceps: [], errors: ['Formato de arquivo nao suportado. Use .csv ou .xlsx'], sensitiveWarning: false };
+  return { ceps: [], errors: ['Formato de arquivo não suportado. Use .csv ou .xlsx'], sensitiveWarning: false };
 }
 
 function clampAnalysisRadius(value: number) {
@@ -135,17 +162,17 @@ function inferCompetitorOptions(activityDescription: string): Array<{ type: Comp
   }
 
   const reasons: Record<CompetitorType, string> = {
-    Todos: 'Recomendado para uma primeira leitura ampla da regiao.',
+    Todos: 'Recomendado para uma primeira leitura ampla da região.',
     'Concorrentes diretos do ramo informado': 'Busca empresas com oferta parecida com o ramo descrito.',
-    'Concorrentes locais similares': 'Encontra negocios parecidos mesmo quando usam outra descricao publica.',
-    'Redes e franquias do setor': 'Mostra marcas estruturadas que competem por preco, confianca ou presenca.',
-    'Substitutos e alternativas de compra': 'Mapeia opcoes que resolvem o mesmo problema de outro jeito.',
+    'Concorrentes locais similares': 'Encontra negócios parecidos mesmo quando usam outra descrição pública.',
+    'Redes e franquias do setor': 'Mostra marcas estruturadas que competem por preço, confiança ou presença.',
+    'Substitutos e alternativas de compra': 'Mapeia opções que resolvem o mesmo problema de outro jeito.',
     'Prestadores autônomos e pequenos negócios': 'Considera profissionais independentes e ofertas menores.',
     'Marketplaces, delivery e canais digitais': 'Inclui canais digitais, aplicativos e venda online quando fizer sentido.',
     'Polos geradores de público': 'Mostra locais que concentram fluxo e podem influenciar demanda.',
-    'Negócios complementares para parceria': 'Encontra negocios que podem indicar clientes ou fazer acoes conjuntas.',
-    'Barreiras de acesso e conveniência': 'Observa fatores de acesso, conveniencia e deslocamento.',
-    'Concorrentes bem avaliados no Google': 'Prioriza negocios com reputacao publica forte.'
+    'Negócios complementares para parceria': 'Encontra negócios que podem indicar clientes ou fazer ações conjuntas.',
+    'Barreiras de acesso e conveniência': 'Observa fatores de acesso, conveniência e deslocamento.',
+    'Concorrentes bem avaliados no Google': 'Prioriza negócios com reputação pública forte.'
   };
 
   return [...COMPETITOR_TYPES]
@@ -209,9 +236,12 @@ export function MarketIntelligenceApp() {
   const [errors, setErrors] = useState<string[]>([]);
   const [sensitiveWarning, setSensitiveWarning] = useState(false);
   const [loadingCnpj, setLoadingCnpj] = useState(false);
+  const [loadingCep, setLoadingCep] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [recoverableError, setRecoverableError] = useState<string | null>(null);
+  const [manualCepFeedback, setManualCepFeedback] = useState<string | null>(null);
   const [blobWarning, setBlobWarning] = useState<string | null>(null);
   const [uploadedBlob, setUploadedBlob] = useState<UploadedBlob | null>(null);
 
@@ -228,6 +258,76 @@ export function MarketIntelligenceApp() {
   const hasLocation = isExistingFlow ? hasExistingBusiness : isNewBusinessFlow && (hasManualCep || hasManualAddress);
   const hasRequiredBusinessName = isExistingFlow || businessName.trim().length >= 2;
   const canAnalyze = Boolean(businessMode) && hasRequiredBusinessName && hasMarketScope && hasLocation && competitorTypes.length > 0 && !loadingAnalysis;
+
+  function showRecoverableError(message?: string) {
+    setRecoverableError(message ? `${message} ${FRIENDLY_ERROR_MESSAGE}` : FRIENDLY_ERROR_MESSAGE);
+  }
+
+  useEffect(() => {
+    function handleRuntimeError(event: ErrorEvent) {
+      event.preventDefault();
+      showRecoverableError(event.message || undefined);
+    }
+
+    function handleUnhandledRejection(event: PromiseRejectionEvent) {
+      event.preventDefault();
+      const reason = event.reason instanceof Error ? event.reason.message : String(event.reason || '');
+      showRecoverableError(reason || undefined);
+    }
+
+    window.addEventListener('error', handleRuntimeError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', handleRuntimeError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
+  useEffect(() => {
+    const cep = normalizeCep(manualCep);
+    if (!isNewBusinessFlow || cep.length < 8) {
+      setManualCepFeedback(null);
+      setLoadingCep(false);
+      return;
+    }
+
+    if (!isValidCep(cep)) {
+      setManualCepFeedback('Informe um CEP válido com 8 dígitos.');
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLoadingCep(true);
+      setManualCepFeedback(null);
+      try {
+        const response = await fetch('/api/cep', {
+          method: 'POST',
+          headers: jsonHeaders(),
+          body: JSON.stringify({ cep }),
+          signal: controller.signal
+        });
+        const json = await response.json() as { error?: string; logradouro?: string; bairro?: string; cidade?: string; uf?: string };
+        if (!response.ok) throw new Error(json.error || 'Não foi possível consultar o CEP.');
+
+        setManualAddress((current) => json.logradouro || current);
+        setManualNeighborhood((current) => json.bairro || current);
+        setManualCity((current) => json.cidade || current);
+        setManualUf((current) => (json.uf || current || '').toUpperCase().slice(0, 2));
+        setManualCepFeedback('CEP encontrado. Endereço preenchido automaticamente; revise número e complemento, se necessário.');
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setManualCepFeedback(error instanceof Error ? error.message : 'Não foi possível consultar o CEP.');
+      } finally {
+        if (!controller.signal.aborted) setLoadingCep(false);
+      }
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [manualCep, isNewBusinessFlow]);
 
   async function deleteTemporaryBlob(blob: UploadedBlob | null) {
     if (!blob) return false;
@@ -261,7 +361,9 @@ export function MarketIntelligenceApp() {
         setBusinessActivityDescription(found.cnaePrincipalDescricao);
       }
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : 'Erro ao consultar CNPJ.');
+      const message = error instanceof Error ? error.message : 'Erro ao consultar CNPJ.';
+      setGlobalError(message);
+      showRecoverableError(message);
     } finally {
       setLoadingCnpj(false);
     }
@@ -311,7 +413,7 @@ export function MarketIntelligenceApp() {
     setErrors(parsed.errors);
     setSensitiveWarning(parsed.sensitiveWarning);
     if (parsed.ceps.length) {
-      setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s). A analise usara apenas esses CEPs, sem nomes, telefones ou e-mails.`);
+      setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s). A análise usará apenas esses CEPs, sem nomes, telefones ou e-mails.`);
     }
 
     try {
@@ -319,14 +421,14 @@ export function MarketIntelligenceApp() {
       formData.append('file', file);
       const upload = await fetch('/api/blob/upload', { method: 'POST', headers: requestHeaders(), body: formData });
       const data = await upload.json() as { error?: string; blobName?: string };
-      if (!upload.ok || !data.blobName) throw new Error(data.error || 'Nao foi possivel enviar o arquivo temporario.');
+      if (!upload.ok || !data.blobName) throw new Error(data.error || 'Não foi possível enviar o arquivo temporário.');
       setUploadedBlob({ blobName: data.blobName });
-      if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s). O arquivo temporario sera apagado depois da analise.`);
+      if (parsed.ceps.length) setBlobWarning(`${parsed.ceps.length} CEP(s) lido(s). O arquivo temporário será apagado depois da análise.`);
     } catch {
       if (parsed.ceps.length) {
-        setBlobWarning('CEPs lidos com sucesso. O upload temporario ao Azure Blob nao foi concluido, mas a analise pode continuar porque os CEPs ja foram processados no navegador.');
+        setBlobWarning('CEPs lidos com sucesso. O upload temporário ao Azure Blob não foi concluído, mas a análise pode continuar porque os CEPs já foram processados no navegador.');
       } else {
-        setBlobWarning('O upload temporario nao foi concluido. Verifique se o arquivo tem uma coluna chamada CEP e tente novamente.');
+        setBlobWarning('O upload temporário não foi concluído. Verifique se o arquivo tem uma coluna chamada CEP e tente novamente.');
       }
     }
   }
@@ -360,18 +462,20 @@ export function MarketIntelligenceApp() {
         })
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Erro ao processar analise.');
+      if (!response.ok) throw new Error(json.error || 'Erro ao processar análise.');
       setResult(json.result);
       if (uploadedBlob) {
         const deleted = await deleteTemporaryBlob(uploadedBlob);
         setUploadedBlob(null);
         setBlobWarning(deleted
-          ? 'Analise concluida e arquivo temporario apagado do Azure Blob Storage.'
-          : 'Analise concluida. Nao foi possivel confirmar a exclusao do arquivo temporario; verifique as permissoes do Azure Blob Storage.');
+          ? 'Análise concluída e arquivo temporário apagado do Azure Blob Storage.'
+          : 'Análise concluída. Não foi possível confirmar a exclusão do arquivo temporário; verifique as permissões do Azure Blob Storage.');
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : 'Erro ao processar analise.');
+      const message = error instanceof Error ? error.message : 'Erro ao processar análise.';
+      setGlobalError(message);
+      showRecoverableError(message);
     } finally {
       setLoadingAnalysis(false);
     }
@@ -381,6 +485,15 @@ export function MarketIntelligenceApp() {
     return (
       <main className="min-h-screen bg-slate-100">
         <Header />
+        {recoverableError && (
+          <FriendlyErrorDialog
+            message={recoverableError}
+            onConfirm={() => {
+              setRecoverableError(null);
+              void clearSiteCacheAndReload();
+            }}
+          />
+        )}
         <div className="mx-auto max-w-5xl px-4 py-8 md:px-8">
           <div className="no-print mb-5 flex justify-end">
             <button
@@ -388,7 +501,7 @@ export function MarketIntelligenceApp() {
               onClick={() => setResult(null)}
               className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
-              Nova analise
+              Nova análise
             </button>
           </div>
           <Dashboard result={result} />
@@ -403,13 +516,23 @@ export function MarketIntelligenceApp() {
       <div className="mx-auto max-w-5xl px-4 py-8 md:px-8">
         <CourseReferences />
 
+        {recoverableError && (
+          <FriendlyErrorDialog
+            message={recoverableError}
+            onConfirm={() => {
+              setRecoverableError(null);
+              void clearSiteCacheAndReload();
+            }}
+          />
+        )}
+
         <Card className="mb-6 border-orange-200 bg-orange-50">
           <div className="flex gap-3">
             <ShieldCheck className="mt-1 h-5 w-5 flex-none text-orange-600" />
             <div>
               <h2 className="font-semibold text-slate-900">Aviso LGPD</h2>
               <p className="mt-1 text-sm text-slate-700">
-                A ferramenta usa apenas os dados necessarios para gerar a analise. CNPJ e endereco ajudam a localizar a regiao; CEPs de clientes, quando enviados, sao opcionais e processados sem nomes, telefones ou e-mails.
+                A ferramenta usa apenas os dados necessários para gerar a análise. CNPJ e endereço ajudam a localizar a região; CEPs de clientes, quando enviados, são opcionais e processados sem nomes, telefones ou e-mails.
               </p>
             </div>
           </div>
@@ -426,22 +549,22 @@ export function MarketIntelligenceApp() {
 
         <section className="space-y-6">
           <Card>
-            <Badge className="bg-slate-100 text-slate-600">1 — Negocio e regiao</Badge>
-            <h2 className="mt-4 text-2xl font-bold text-slate-900">Que negocio voce quer analisar?</h2>
+            <Badge className="bg-slate-100 text-slate-600">1 — Negócio e região</Badge>
+            <h2 className="mt-4 text-2xl font-bold text-slate-900">Que negócio você quer analisar?</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Primeiro informe se a empresa ja existe. Depois a ferramenta pede apenas os dados necessarios para localizar a regiao e entender o ramo de atuacao.
+              Primeiro informe se a empresa já existe. Depois a ferramenta pede apenas os dados necessários para localizar a região e entender o ramo de atuação.
             </p>
 
             <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-bold text-slate-900">Voce ja possui uma empresa?</p>
-              <p className="mt-1 text-sm text-slate-500">Escolha Sim para consultar um CNPJ existente, ou Nao para estudar um novo ponto comercial.</p>
+              <p className="text-sm font-bold text-slate-900">Você já possui uma empresa?</p>
+              <p className="mt-1 text-sm text-slate-500">Escolha Sim para consultar um CNPJ existente, ou Não para estudar um novo ponto comercial.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => chooseBusinessMode('existing')}
                   className={`rounded-2xl border px-4 py-3 text-left transition ${isExistingFlow ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-300'}`}
                 >
-                  <span className="block font-bold text-slate-900">Sim, ja tenho uma empresa</span>
+                  <span className="block font-bold text-slate-900">Sim, já tenho uma empresa</span>
                   <span className="mt-1 block text-sm text-slate-500">Vou informar o CNPJ para carregar dados cadastrais.</span>
                 </button>
                 <button
@@ -449,8 +572,8 @@ export function MarketIntelligenceApp() {
                   onClick={() => chooseBusinessMode('new')}
                   className={`rounded-2xl border px-4 py-3 text-left transition ${isNewBusinessFlow ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-300'}`}
                 >
-                  <span className="block font-bold text-slate-900">Nao, estou estudando abrir uma empresa</span>
-                  <span className="mt-1 block text-sm text-slate-500">Vou informar nome pretendido e endereco de referencia.</span>
+                  <span className="block font-bold text-slate-900">Não, estou estudando abrir uma empresa</span>
+                  <span className="mt-1 block text-sm text-slate-500">Vou informar nome pretendido e endereço de referência.</span>
                 </button>
               </div>
             </div>
@@ -480,12 +603,12 @@ export function MarketIntelligenceApp() {
                       </button>
                     </div>
                     <div className="grid gap-2 md:grid-cols-2">
-                      <p><strong>Razao Social:</strong> {unidade.razaoSocial}</p>
-                      <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Nao informado'}</p>
+                      <p><strong>Razão Social:</strong> {unidade.razaoSocial}</p>
+                      <p><strong>Nome Fantasia:</strong> {unidade.nomeFantasia || 'Não informado'}</p>
                       <p><strong>CNPJ:</strong> {formatCnpj(unidade.cnpj)}</p>
-                      <p><strong>Situacao:</strong> {unidade.situacaoCadastral}</p>
+                      <p><strong>Situação:</strong> {unidade.situacaoCadastral}</p>
                       <p><strong>CEP:</strong> {formatCep(unidade.cep)}</p>
-                      <p className="md:col-span-2"><strong>Endereco:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
+                      <p className="md:col-span-2"><strong>Endereço:</strong> {unidade.logradouro}, {unidade.numero} — {unidade.bairro}, {unidade.municipio}/{unidade.uf}</p>
                     </div>
                   </div>
                 )}
@@ -496,22 +619,25 @@ export function MarketIntelligenceApp() {
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                   <MapPin className="h-4 w-4 text-orange-600" />
-                  Dados do novo negocio
+                  Dados do novo negócio
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  Informe o nome pretendido e a localizacao onde voce imagina abrir a empresa. Um CEP valido ja ajuda bastante; endereco, cidade e UF deixam a leitura mais precisa.
+                  Informe o nome pretendido e a localização onde você imagina abrir a empresa. Um CEP válido já ajuda bastante; endereço, cidade e UF deixam a leitura mais precisa.
                 </p>
                 <div className="mt-4">
                   <label className="text-sm font-semibold text-slate-800" htmlFor="business-name">Nome pretendido para a empresa</label>
                   <Input id="business-name" value={businessName} onChange={(event) => setBusinessName(event.target.value)} placeholder="Ex: Padaria do Bairro" />
                 </div>
                 <div className="mt-4">
-                  <label className="text-sm font-semibold text-slate-800" htmlFor="manual-cep">CEP de referencia <span className="text-slate-400">(opcional se preencher endereco)</span></label>
+                  <label className="text-sm font-semibold text-slate-800" htmlFor="manual-cep">CEP de referência <span className="text-slate-400">(preenche o endereço automaticamente)</span></label>
                   <Input id="manual-cep" value={manualCep} onChange={(event) => setManualCep(event.target.value)} placeholder="Ex: 22775-003" />
+                  <div className="mt-2 min-h-5 text-xs text-slate-500">
+                    {loadingCep ? 'Consultando CEP...' : manualCepFeedback}
+                  </div>
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-[2fr_1fr]">
-                  <Input value={manualAddress} onChange={(event) => setManualAddress(event.target.value)} placeholder="Rua, avenida ou ponto de referencia" />
-                  <Input value={manualNumber} onChange={(event) => setManualNumber(event.target.value)} placeholder="Numero" />
+                  <Input value={manualAddress} onChange={(event) => setManualAddress(event.target.value)} placeholder="Rua, avenida ou ponto de referência" />
+                  <Input value={manualNumber} onChange={(event) => setManualNumber(event.target.value)} placeholder="Número" />
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-[1.5fr_1.5fr_0.7fr]">
                   <Input value={manualNeighborhood} onChange={(event) => setManualNeighborhood(event.target.value)} placeholder="Bairro" />
@@ -523,7 +649,7 @@ export function MarketIntelligenceApp() {
 
             {businessMode && (
               <div className="mt-5">
-                <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atuacao <span className="text-orange-600">(obrigatorio)</span></label>
+                <label className="text-sm font-semibold text-slate-800" htmlFor="business-activity-description">Ramo de atuação <span className="text-orange-600">(obrigatório)</span></label>
                 <textarea
                   id="business-activity-description"
                   value={businessActivityDescription}
@@ -532,7 +658,7 @@ export function MarketIntelligenceApp() {
                   className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                 />
                 <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                  <span>Quanto mais especifico, mais coerente sera a busca por concorrentes.</span>
+                  <span>Quanto mais específico, mais coerente será a busca por concorrentes.</span>
                   <span>{businessActivityDescription.length}/300</span>
                 </div>
               </div>
@@ -542,10 +668,10 @@ export function MarketIntelligenceApp() {
           {businessMode && (
             <>
           <Card>
-            <Badge className="bg-slate-100 text-slate-600">2 — Concorrencia</Badge>
+            <Badge className="bg-slate-100 text-slate-600">2 — Concorrência</Badge>
             <h2 className="mt-4 text-xl font-bold text-slate-900">Quais concorrentes devem entrar na leitura?</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Para vender melhor, a primeira analise pode ficar em <strong>Todos</strong>. Se voce quiser uma leitura mais focada, escolha categorias especificas.
+              Para vender melhor, a primeira análise pode ficar em <strong>Todos</strong>. Se você quiser uma leitura mais focada, escolha categorias específicas.
             </p>
             {businessActivityDescription.trim() && (
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -567,12 +693,12 @@ export function MarketIntelligenceApp() {
           </Card>
 
           <Card>
-            <Badge className="bg-slate-100 text-slate-600">3 — Raio de analise</Badge>
-            <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha ate onde olhar ao redor</h2>
-            <p className="mt-2 text-sm text-slate-500">Comece com 4 km para negocios locais. Aumente se o cliente costuma se deslocar ou se o servico tem alcance regional.</p>
+            <Badge className="bg-slate-100 text-slate-600">3 — Raio de análise</Badge>
+            <h2 className="mt-4 text-xl font-bold text-slate-900">Escolha até onde olhar ao redor</h2>
+            <p className="mt-2 text-sm text-slate-500">Comece com 4 km para negócios locais. Aumente se o cliente costuma se deslocar ou se o serviço tem alcance regional.</p>
             <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-semibold text-slate-700">Raio em torno da localizacao</span>
+                <span className="text-sm font-semibold text-slate-700">Raio em torno da localização</span>
                 <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{safeAnalysisRadiusKm} km</span>
               </div>
               <input
@@ -598,7 +724,7 @@ export function MarketIntelligenceApp() {
               <h2 className="mt-4 text-xl font-bold text-slate-900">CEPs de clientes <span className="text-slate-400">(opcional)</span></h2>
               <>
                 <p className="mt-2 text-sm text-slate-500">
-                  Como voce informou um CNPJ, pode enviar CEPs de clientes atuais para entender onde sua base real aparece. Se nao tiver planilha, pule esta etapa.
+                  Como você informou um CNPJ, pode enviar CEPs de clientes atuais para entender onde sua base real aparece. Se não tiver planilha, pule esta etapa.
                 </p>
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   <p><strong>Formato aceito:</strong> uma coluna chamada <code className="rounded bg-white px-1 py-0.5">cep</code>. Pode usar <code className="rounded bg-white px-1 py-0.5">22775003</code>, <code className="rounded bg-white px-1 py-0.5">22775-003</code> ou <code className="rounded bg-white px-1 py-0.5">22.775-003</code>.</p>
@@ -610,15 +736,15 @@ export function MarketIntelligenceApp() {
                 <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-orange-400 hover:bg-orange-50">
                   <FileSpreadsheet className="h-10 w-10 text-orange-500" />
                   <span className="mt-3 font-semibold text-slate-800">Selecionar arquivo CSV/XLSX de CEPs</span>
-                  <span className="mt-1 text-sm text-slate-500">Apenas a coluna CEP sera processada. Limite de 50MB.</span>
+                  <span className="mt-1 text-sm text-slate-500">Apenas a coluna CEP será processada. Limite de 50MB.</span>
                   <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(event) => handleFile(event.target.files?.[0] || null)} />
                 </label>
-                {sensitiveWarning && <p className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm text-yellow-800">Foram identificadas colunas desnecessarias. Apenas os CEPs serao processados.</p>}
+                {sensitiveWarning && <p className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm text-yellow-800">Foram identificadas colunas desnecessárias. Apenas os CEPs serão processados.</p>}
                 {blobWarning && <p className="mt-4 rounded-2xl bg-blue-50 p-3 text-sm text-blue-800">{blobWarning}</p>}
                 {errors.length > 0 && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{errors.slice(0, 5).map((error) => <p key={error}>{error}</p>)}</div>}
                 {uniqueCeps.length > 0 && (
                   <div className="mt-5">
-                    <h3 className="font-semibold text-slate-900">Pre-visualizacao dos CEPs</h3>
+                    <h3 className="font-semibold text-slate-900">Pré-visualização dos CEPs</h3>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {uniqueCeps.slice(0, 40).map((cep) => <Badge key={cep} className="bg-slate-100 text-slate-700">{formatCep(cep)}</Badge>)}
                       {uniqueCeps.length > 40 && <Badge className="bg-slate-100 text-slate-700">+{uniqueCeps.length - 40}</Badge>}
@@ -633,24 +759,28 @@ export function MarketIntelligenceApp() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <Badge className="bg-orange-100 text-orange-700">{resultStep} — Resultado</Badge>
-                <h2 className="mt-3 text-2xl font-bold text-slate-900">Gerar analise de mercado</h2>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900">Gerar análise de mercado</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  A ferramenta vai analisar {businessActivityDescription.trim() || 'o ramo informado'} em um raio de {safeAnalysisRadiusKm} km, usando {hasExistingBusiness ? 'o endereco do CNPJ' : 'a localizacao informada'}.
+                  A ferramenta vai analisar {businessActivityDescription.trim() || 'o ramo informado'} em um raio de {safeAnalysisRadiusKm} km, usando {hasExistingBusiness ? 'o endereço do CNPJ' : 'a localização informada'}.
                 </p>
               </div>
               <Button className="min-w-52" onClick={startAnalysis} disabled={!canAnalyze}>
                 {loadingAnalysis ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
-                Analisar regiao
+                Analisar região
               </Button>
             </div>
             {!canAnalyze && (
-              <p className="mt-4 text-sm text-slate-500">
-                {isExistingFlow && !hasExistingBusiness
-                  ? 'Para iniciar, informe e consulte o CNPJ da empresa.'
-                  : isNewBusinessFlow && !hasRequiredBusinessName
-                    ? 'Para iniciar, informe o nome pretendido da nova empresa.'
-                    : 'Para iniciar, informe o ramo de atuacao, uma localizacao por CEP ou endereco, e mantenha pelo menos um tipo de concorrente selecionado.'}
-              </p>
+              <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 p-4 text-sm text-orange-900">
+                <p className="font-bold">Para liberar o botão, preencha:</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {!businessMode && <li>Informe se você já possui uma empresa.</li>}
+                  {isExistingFlow && !hasExistingBusiness && <li>Consulte um CNPJ válido.</li>}
+                  {isNewBusinessFlow && !hasRequiredBusinessName && <li>Informe o nome pretendido da nova empresa.</li>}
+                  {!hasMarketScope && <li>Descreva o ramo de atuação com pelo menos 3 caracteres.</li>}
+                  {businessMode && !hasLocation && <li>Informe uma localização por CEP válido ou por endereço, cidade e UF.</li>}
+                  {competitorTypes.length === 0 && <li>Selecione pelo menos um tipo de concorrente.</li>}
+                </ul>
+              </div>
             )}
           </Card>
             </>
@@ -666,8 +796,8 @@ function Header() {
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-8">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligencia de Mercado</p>
-          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Analise regional de mercado</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Inteligência de Mercado</p>
+          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Análise regional de mercado</h1>
         </div>
         <a
           href="https://www.myrobotbarra.com.br/"
@@ -687,18 +817,43 @@ function Header() {
   );
 }
 
+function FriendlyErrorDialog({ message, onConfirm }: { message: string; onConfirm: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
+      <div role="alertdialog" aria-modal="true" className="max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="flex gap-3">
+          <AlertTriangle className="mt-1 h-6 w-6 flex-none text-orange-600" />
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Vamos tentar novamente</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{message}</p>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600"
+          >
+            OK, limpar e recarregar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CourseReferences() {
   return (
     <Card className="mb-6">
-      <div className="grid gap-5 md:grid-cols-[1.2fr_1fr] md:items-center">
+      <div className="grid gap-5 md:grid-cols-[1.1fr_1.2fr] md:items-center">
         <div>
           <Badge className="bg-orange-100 text-orange-700">Projeto educacional aplicado</Badge>
           <h2 className="mt-3 text-2xl font-bold text-slate-900">Ferramenta criada para praticar IA, dados e desenvolvimento de apps</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Esta aplicacao demonstra, em uma experiencia pratica, conceitos ensinados nos cursos de Inteligencia Artificial e App Developer da My Robot Barra da Tijuca.
+            Esta aplicação demonstra, em uma experiência prática, conceitos ensinados nos cursos de Inteligência Artificial, App Developer e My Robot Business da My Robot Barra da Tijuca.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           {COURSE_REFERENCES.map((course) => (
             <a key={course.title} href={course.href} target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center transition hover:border-orange-300 hover:bg-orange-50">
               <img src={course.logo} alt={course.title} className="mx-auto h-14 max-w-full object-contain" />

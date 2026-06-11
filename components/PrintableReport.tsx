@@ -24,8 +24,8 @@ const PRINT_MAP_HEIGHT = 512;
 const PRINT_MAP_TILE_SIZE = 256;
 
 function starLabel(rating?: number | null, count?: number | null) {
-  if (!rating) return 'Sem avaliacao Google';
-  return `${rating.toFixed(1)} (${count || 0} avaliacoes)`;
+  if (!rating) return 'Sem avaliação Google';
+  return `${rating.toFixed(1)} (${count || 0} avaliações)`;
 }
 
 function valueOrDash(value: unknown) {
@@ -228,15 +228,15 @@ function normalizePrintBusinessModelCanvas(result: AnalysisResult): BusinessMode
   const hasCustomerCepData = result.points.length > 0;
   const topBairro = result.afinidadePorBairro[0]?.bairro || result.unidade.bairro;
   const fallback: BusinessModelCanvas = {
-    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniencia local e prova social no raio analisado.`],
-    segmentosDeClientes: [hasCustomerCepData ? `Clientes proximos de ${topBairro}.` : `Clientes potenciais no raio de ${result.analysisRadiusKm} km.`, 'Compradores que pesquisam e comparam opcoes no Google.'],
-    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', hasCustomerCepData ? 'Campanhas por raio nos bairros prioritarios.' : `Campanhas por raio de ${result.analysisRadiusKm} km para validar demanda.`],
-    relacionamentoComClientes: ['Atendimento consultivo, rapido e com proximo passo simples.', 'Follow-up por bairro, origem do lead e objecao registrada.'],
-    fontesDeReceita: [`Venda direta de ${segment}.`, 'Pacotes, planos, recorrencia ou servicos complementares quando fizer sentido.'],
-    recursosChave: ['Perfil Google atualizado, argumentos comerciais e registro de leads.', 'Equipe ou responsavel por resposta rapida.'],
-    atividadesChave: ['Monitorar concorrentes, avaliacoes e objecoes.', 'Testar mensagens locais e medir conversao por origem.'],
-    parceriasChave: ['Negocios complementares da regiao para indicacao mutua.'],
-    estruturaDeCustos: ['Midia local de baixo orçamento para testes.', 'Tempo de atendimento, follow-up, materiais e ferramentas de operacao.']
+    propostaDeValor: [`${unitName} deve comunicar ${segment} com clareza, conveniência local e prova social no raio analisado.`],
+    segmentosDeClientes: [hasCustomerCepData ? `Clientes próximos de ${topBairro}.` : `Clientes potenciais no raio de ${result.analysisRadiusKm} km.`, 'Compradores que pesquisam e comparam opções no Google.'],
+    canais: ['Google Maps e busca local.', 'WhatsApp ou canal direto de atendimento.', hasCustomerCepData ? 'Campanhas por raio nos bairros prioritários.' : `Campanhas por raio de ${result.analysisRadiusKm} km para validar demanda.`],
+    relacionamentoComClientes: ['Atendimento consultivo, rápido e com próximo passo simples.', 'Follow-up por bairro, origem do lead e objeção registrada.'],
+    fontesDeReceita: [`Venda direta de ${segment}.`, 'Pacotes, planos, recorrência ou serviços complementares quando fizer sentido.'],
+    recursosChave: ['Perfil Google atualizado, argumentos comerciais e registro de leads.', 'Equipe ou responsável por resposta rápida.'],
+    atividadesChave: ['Monitorar concorrentes, avaliações e objeções.', 'Testar mensagens locais e medir conversão por origem.'],
+    parceriasChave: ['Negócios complementares da região para indicação mútua.'],
+    estruturaDeCustos: ['Mídia local de baixo orçamento para testes.', 'Tempo de atendimento, follow-up, materiais e ferramentas de operação.']
   };
 
   return PRINT_CANVAS_BLOCKS.reduce((canvas, block) => {
@@ -253,11 +253,11 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
   const indirect = result.strategicPlaces.filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente indireto')).length;
   const recommendations = result.recomendacoesInteligentes || {
     prioridadePrincipal: hasCustomerCepData ? 'Priorize os bairros com clientes reais e valide a resposta comercial antes de ampliar investimento.' : 'Valide a demanda no raio analisado antes de assumir quais bairros concentram clientes.',
-    brechaCompetitiva: 'Use conveniencia, clareza de oferta e prova social local para se diferenciar de alternativas proximas.',
-    personaFoco: 'Foque decisores que precisam de confianca, resposta rapida e comparacao simples entre opcoes.',
-    objecaoProvavel: 'A objecao mais provavel e comparacao de preco, reputacao ou conveniencia.',
-    respostaRecomendada: 'Responda com diferencial concreto, prazo, prova social e proximo passo simples.',
-    mensagemPronta: `A ${unitName} atende sua regiao com orientacao clara e resposta rapida. Posso mostrar a melhor opcao para o que voce precisa hoje?`
+    brechaCompetitiva: 'Use conveniência, clareza de oferta e prova social local para se diferenciar de alternativas próximas.',
+    personaFoco: 'Foque decisores que precisam de confiança, resposta rápida e comparação simples entre opções.',
+    objecaoProvavel: 'A objeção mais provável é comparação de preço, reputação ou conveniência.',
+    respostaRecomendada: 'Responda com diferencial concreto, prazo, prova social e próximo passo simples.',
+    mensagemPronta: `A ${unitName} atende sua região com orientação clara e resposta rápida. Posso mostrar a melhor opção para o que você precisa hoje?`
   };
   const position = result.posicionamentoUnidade;
   const businessModelCanvas = normalizePrintBusinessModelCanvas(result);
@@ -266,15 +266,15 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
   const topEconomic = result.perfilEconomico.slice(0, 6);
   const distanceRows = result.estatisticas.distribuicaoDistancias.map((item, index) => ({ label: item.faixa, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
   const neighborhoodRows = result.estatisticas.topBairros.slice(0, 8).map((item, index) => ({ label: `${item.bairro}, ${item.cidade}`, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
-  const scopeLabel = result.businessActivityDescription ? `Ramo informado: ${result.businessActivityDescription}` : 'Ramo nao informado no relatorio antigo';
+  const scopeLabel = result.businessActivityDescription ? `Ramo informado: ${result.businessActivityDescription}` : 'Ramo não informado no relatório antigo';
 
   return (
     <div id="analysis-report" className="print-report">
       <PrintPage className="print-cover">
         <header className="print-header">
           <div>
-            <p className="print-kicker">Inteligencia de Mercado</p>
-            <h1>Analise regional de concorrencia</h1>
+            <p className="print-kicker">Inteligência de Mercado</p>
+            <h1>Análise regional de concorrência</h1>
             <p>{unitName}</p>
           </div>
           <div className="print-date">
@@ -289,21 +289,21 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
         </div>
 
         <div className="print-metrics-grid">
-          <PrintMetric label="CEPs validos" value={result.estatisticas.totalValidos} />
+          <PrintMetric label="CEPs válidos" value={result.estatisticas.totalValidos} />
           <PrintMetric label="Bairros de clientes" value={hasCustomerCepData ? result.estatisticas.topBairros.length : 'Sem planilha'} />
           <PrintMetric label="Concorrentes diretos" value={direct} />
           <PrintMetric label="Concorrentes indiretos" value={indirect} />
           <PrintMetric label="Oportunidade" value={`${result.estatisticas.indiceOportunidadeMercado}/100`} />
-          <PrintMetric label="Distancia media" value={result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMediaKm) : 'Sem planilha'} />
+          <PrintMetric label="Distância média" value={result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMediaKm) : 'Sem planilha'} />
         </div>
 
         <div className="print-two-columns">
           <PrintBlock title="Empresa analisada">
-            <p><strong>Razao social:</strong> {result.unidade.razaoSocial}</p>
+            <p><strong>Razão social:</strong> {result.unidade.razaoSocial}</p>
             {result.unidade.cnpj && <p><strong>CNPJ:</strong> {result.unidade.cnpj}</p>}
-            <p><strong>Endereco:</strong> {result.unidade.logradouro}, {result.unidade.numero} - {result.unidade.bairro}, {result.unidade.municipio}/{result.unidade.uf}</p>
+            <p><strong>Endereço:</strong> {result.unidade.logradouro}, {result.unidade.numero} - {result.unidade.bairro}, {result.unidade.municipio}/{result.unidade.uf}</p>
           </PrintBlock>
-          <PrintBlock title="Escopo da analise">
+          <PrintBlock title="Escopo da análise">
             <p><strong>Escopo usado:</strong> {scopeLabel}</p>
             <p><strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}</p>
             <p>{hasCustomerCepData ? 'Os bairros de clientes deste relatório vêm da planilha de CEPs enviada.' : 'Nenhuma planilha de CEPs foi enviada; o relatório não infere bairros de clientes a partir de concorrentes.'}</p>
@@ -324,7 +324,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       </PrintPage>
 
       <PrintPage>
-        <h2>Recomendacoes e estatisticas</h2>
+        <h2>Recomendações e estatísticas</h2>
         <div className="print-two-columns">
           <PrintBlock title="Prioridade principal">
             <p>{recommendations.prioridadePrincipal}</p>
@@ -391,8 +391,8 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
                 <tr>
                   <th>Local</th>
                   <th>Categoria</th>
-                  <th>Distancia</th>
-                  <th>Avaliacao</th>
+                  <th>Distância</th>
+                  <th>Avaliação</th>
                 </tr>
               </thead>
               <tbody>
@@ -407,29 +407,29 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
               </tbody>
             </table>
           ) : (
-            <p>Nenhum concorrente ou local relevante foi encontrado. Consulte o diagnostico das fontes no fim do relatorio.</p>
+            <p>Nenhum concorrente ou local relevante foi encontrado. Consulte o diagnóstico das fontes no fim do relatório.</p>
           )}
         </PrintBlock>
 
-        <PrintBlock title="Obstaculos de conversao">
+        <PrintBlock title="Obstáculos de conversão">
           {result.obstaculosMatricula.length ? (
             result.obstaculosMatricula.slice(0, 6).map((item) => (
               <div key={`${item.bairro}-${item.tipoObstaculo}`} className="print-ranking-item">
                 <strong>{item.bairro} - {item.tipoObstaculo} ({item.impactoEstimado})</strong>
                 <p>{item.descricao}</p>
-                <p><strong>Acao:</strong> {item.acaoRecomendada}</p>
+                <p><strong>Ação:</strong> {item.acaoRecomendada}</p>
               </div>
             ))
           ) : (
-            <p>Nenhum obstaculo relevante foi identificado.</p>
+            <p>Nenhum obstáculo relevante foi identificado.</p>
           )}
         </PrintBlock>
       </PrintPage>
 
       <PrintPage>
-        <h2>SWOT e plano de acao</h2>
+        <h2>SWOT e plano de ação</h2>
         <div className="print-swot">
-          <PrintBlock title="Forcas">
+          <PrintBlock title="Forças">
             <PrintList items={position.forcasAtuais} limit={4} />
           </PrintBlock>
           <PrintBlock title="Fraquezas">
@@ -438,16 +438,16 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
           <PrintBlock title="Oportunidades">
             <PrintList items={[...position.diferenciaisFrenteConcorrentes, ...position.ajustesIncrementaisSugeridos, ...position.hipotesesParaTestar]} limit={4} />
           </PrintBlock>
-          <PrintBlock title="Ameacas">
+          <PrintBlock title="Ameaças">
             <PrintList items={result.obstaculosMatricula.map((item) => `${item.tipoObstaculo} em ${item.bairro}: ${item.acaoRecomendada}`)} limit={4} />
           </PrintBlock>
         </div>
 
-        <PrintBlock title="Plano de acao">
+        <PrintBlock title="Plano de ação">
           {result.planoDeAcao.slice(0, 6).map((item) => (
             <div key={item.prioridade} className="print-action-item">
               <strong>{item.prioridade}. {item.acao}</strong>
-              <p>{item.tipo} | Impacto {item.impactoEsperado} | Execucao {item.facilidadeExecucao} | Prazo {item.prazoSugerido}</p>
+              <p>{item.tipo} | Impacto {item.impactoEsperado} | Execução {item.facilidadeExecucao} | Prazo {item.prazoSugerido}</p>
               <p><strong>KPI:</strong> {item.kpiParaMedirSucesso}</p>
             </div>
           ))}
@@ -455,8 +455,8 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       </PrintPage>
 
       <PrintPage>
-        <h2>Canvas do modelo de negocio</h2>
-        <p className="print-page-intro">Sintese aplicada do modelo de negocio sugerido pela analise, considerando escopo informado, regiao, concorrentes, canais e possiveis parcerias.</p>
+        <h2>Canvas do modelo de negócio</h2>
+        <p className="print-page-intro">Síntese aplicada do modelo de negócio sugerido pela análise, considerando escopo informado, região, concorrentes, canais e possíveis parcerias.</p>
         <div className="print-canvas-grid">
           {PRINT_CANVAS_BLOCKS.map((block) => (
             <PrintBlock key={block.key} title={block.title}>
@@ -467,7 +467,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       </PrintPage>
 
       <PrintPage>
-        <h2>Personas, evolucao e fontes</h2>
+        <h2>Personas, evolução e fontes</h2>
         <div className="print-two-columns">
           <PrintBlock title="Personas principais">
             {result.personas.slice(0, 4).map((persona) => (
@@ -478,7 +478,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
               </div>
             ))}
           </PrintBlock>
-          <PrintBlock title="Evolucao incremental">
+          <PrintBlock title="Evolução incremental">
             <p><strong>Manter:</strong></p>
             <PrintList items={result.evolucaoIncremental.manter} limit={3} />
             <p><strong>Melhorar:</strong></p>
@@ -487,7 +487,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
             <PrintList items={result.evolucaoIncremental.adicionar} limit={3} />
           </PrintBlock>
         </div>
-        <PrintBlock title="Diagnostico das fontes publicas">
+        <PrintBlock title="Diagnóstico das fontes públicas">
           <ul className="print-diagnostics">
             {result.diagnosticoFontesPublicas.slice(0, 12).map((item) => (
               <li key={item}>{item}</li>

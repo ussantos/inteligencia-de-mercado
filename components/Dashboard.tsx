@@ -16,14 +16,14 @@ const MarketMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-[420px] items-center justify-center rounded-2xl border border-dashed bg-slate-50 text-sm text-slate-500">
-        Carregando mapa da regiao...
+        Carregando mapa da região...
       </div>
     )
   }
 );
 
 function starLabel(rating?: number | null, count?: number | null) {
-  if (!rating) return 'Sem avaliacao Google';
+  if (!rating) return 'Sem avaliação Google';
   return `${rating.toFixed(1)} ★ (${count || 0})`;
 }
 
@@ -49,16 +49,16 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
     <div id="analysis-report-screen" className="screen-report space-y-6">
       <Card>
         <Badge className={phaseColor}>{result.faseMercadoLocal.fase}</Badge>
-        <h2 className="mt-3 text-3xl font-bold text-slate-900">Analise de mercado — {unitName}</h2>
+        <h2 className="mt-3 text-3xl font-bold text-slate-900">Análise de mercado — {unitName}</h2>
         <p className="mt-3 text-slate-600">{result.faseMercadoLocal.justificativa}</p>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <Metric label="Ramo analisado" value={result.businessActivityDescription || 'Nao informado'} compact />
+          <Metric label="Ramo analisado" value={result.businessActivityDescription || 'Não informado'} compact />
           <Metric label="Raio" value={`${result.analysisRadiusKm} km`} />
           <Metric label="Concorrentes diretos" value={directCompetitors.length} />
           <Metric label="Oportunidade" value={`${result.estatisticas.indiceOportunidadeMercado}/100`} />
         </div>
         <Guide>
-          Leia esta primeira parte como uma fotografia rapida do mercado. Ela cruza o ramo informado, o endereco de referencia, o raio escolhido e os concorrentes encontrados. {hasCustomerCepData ? 'Como houve CEPs de clientes, a analise tambem mostra onde sua base atual aparece.' : 'Como nao houve CEPs de clientes, a analise nao tenta inferir bairros de clientes; ela foca nos concorrentes ao redor.'}
+          Leia esta primeira parte como uma fotografia rápida do mercado. Ela cruza o ramo informado, o endereço de referência, o raio escolhido e os concorrentes encontrados. {hasCustomerCepData ? 'Como houve CEPs de clientes, a análise também mostra onde sua base atual aparece.' : 'Como não houve CEPs de clientes, a análise não tenta inferir bairros de clientes; ela foca nos concorrentes ao redor.'}
         </Guide>
       </Card>
 
@@ -67,7 +67,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
           <Sparkles className="h-5 w-5 text-orange-500" />
           <h2 className="text-2xl font-bold text-slate-900">O que fazer primeiro</h2>
         </div>
-        <p className="mt-2 text-sm text-slate-500">Esta secao transforma o diagnostico em orientacao pratica de comunicacao e acao.</p>
+        <p className="mt-2 text-sm text-slate-500">Esta seção transforma o diagnóstico em orientação prática de comunicação e ação.</p>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <Insight title="Prioridade" text={result.recomendacoesInteligentes.prioridadePrincipal} />
           <Insight title="Brecha competitiva" text={result.recomendacoesInteligentes.brechaCompetitiva} />
@@ -86,11 +86,11 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
       <Card>
         <div className="flex items-center gap-2">
           <MapPinned className="h-5 w-5 text-orange-500" />
-          <h2 className="text-2xl font-bold text-slate-900">Mapa da regiao</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Mapa da região</h2>
         </div>
         <p className="mt-2 text-sm text-slate-500">Use o mapa para enxergar a empresa, o raio, concorrentes e, quando enviados, CEPs de clientes.</p>
         <Guide>
-          O mapa ajuda a perceber concentracao: muitos pontos proximos podem indicar pressao competitiva; poucos pontos podem indicar espaco para validar demanda. CEPs de clientes so aparecem se voce enviou a planilha.
+          O mapa ajuda a perceber concentração: muitos pontos próximos podem indicar pressão competitiva; poucos pontos podem indicar espaço para validar demanda. CEPs de clientes só aparecem se você enviou a planilha.
         </Guide>
         <div className="mt-5">
           <MarketMap result={result} />
@@ -100,12 +100,12 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
       {hasCustomerCepData && (
         <Card>
           <h2 className="text-2xl font-bold text-slate-900">Clientes informados</h2>
-          <p className="mt-2 text-sm text-slate-500">Esta leitura usa somente os CEPs enviados. Ela nao mistura concorrentes com clientes.</p>
+          <p className="mt-2 text-sm text-slate-500">Esta leitura usa somente os CEPs enviados. Ela não mistura concorrentes com clientes.</p>
           <div className="mt-5 grid gap-4 md:grid-cols-4">
-            <Metric label="CEPs validos" value={result.estatisticas.totalValidos} />
+            <Metric label="CEPs válidos" value={result.estatisticas.totalValidos} />
             <Metric label="CEPs ignorados" value={result.estatisticas.totalInvalidos} />
-            <Metric label="Distancia media" value={formatKm(result.estatisticas.distanciaMediaKm)} />
-            <Metric label="Distancia mediana" value={formatKm(result.estatisticas.distanciaMedianaKm)} />
+            <Metric label="Distância média" value={formatKm(result.estatisticas.distanciaMediaKm)} />
+            <Metric label="Distância mediana" value={formatKm(result.estatisticas.distanciaMedianaKm)} />
           </div>
           {result.afinidadePorBairro.length > 0 && (
             <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -115,7 +115,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
                     <h3 className="font-bold text-slate-900">{item.bairro}, {item.cidade}</h3>
                     <Badge className="bg-emerald-100 text-emerald-700">{item.score}/100</Badge>
                   </div>
-                  <p className="mt-2 text-sm text-slate-600">{item.cepCount} CEP(s) enviados · distancia media {formatKm(item.distanciaMediaKm)}</p>
+                  <p className="mt-2 text-sm text-slate-600">{item.cepCount} CEP(s) enviados · distância média {formatKm(item.distanciaMediaKm)}</p>
                   <p className="mt-2 text-sm font-semibold text-slate-800">{item.acaoRecomendada}</p>
                 </div>
               ))}
@@ -127,12 +127,12 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
       <Card>
         <h2 className="text-2xl font-bold text-slate-900">Concorrentes principais</h2>
         <p className="mt-2 text-sm text-slate-500">
-          Lista enxuta dos concorrentes mais relevantes encontrados no Google Places dentro do raio escolhido. Use-a para comparar reputacao, distancia, proposta e atendimento.
+          Lista enxuta dos concorrentes mais relevantes encontrados no Google Places dentro do raio escolhido. Use-a para comparar reputação, distância, proposta e atendimento.
         </p>
         {topCompetitors.length === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">Nenhum concorrente relevante foi encontrado.</p>
-            <p className="mt-2">Veja o diagnostico tecnico no fim do relatorio para conferir se o Google Places foi executado corretamente.</p>
+            <p className="mt-2">Veja o diagnóstico técnico no fim do relatório para conferir se o Google Places foi executado corretamente.</p>
           </div>
         ) : (
           <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -146,7 +146,7 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
                   </Badge>
                 </div>
                 <h3 className="mt-2 font-bold text-slate-900">{place.nome}</h3>
-                <p className="mt-1 text-sm text-slate-500">{place.subcategoria} · {place.distanciaKm ? formatKm(place.distanciaKm) : 'distancia nao calculada'}</p>
+                <p className="mt-1 text-sm text-slate-500">{place.subcategoria} · {place.distanciaKm ? formatKm(place.distanciaKm) : 'distância não calculada'}</p>
                 {place.endereco && <p className="mt-1 text-sm text-slate-500">{place.endereco}</p>}
                 <p className="mt-2 text-sm text-slate-700">{place.observacaoEstrategica}</p>
               </div>
@@ -158,14 +158,14 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
       <Card>
         <div className="flex items-center gap-2">
           <Target className="h-5 w-5 text-orange-500" />
-          <h2 className="text-2xl font-bold text-slate-900">Posicionamento e proximos passos</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Posicionamento e próximos passos</h2>
         </div>
         <p className="mt-2 text-sm text-slate-500">Use este bloco para ajustar discurso, atendimento e os primeiros testes comerciais.</p>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <ListCard title="Forcas para comunicar" items={result.posicionamentoUnidade.forcasAtuais.slice(0, 3)} />
+          <ListCard title="Forças para comunicar" items={result.posicionamentoUnidade.forcasAtuais.slice(0, 3)} />
           <ListCard title="Riscos para responder" items={result.posicionamentoUnidade.riscosDePosicionamento.slice(0, 3)} />
-          <ListCard title="Diferenciais a reforcar" items={result.posicionamentoUnidade.diferenciaisFrenteConcorrentes.slice(0, 3)} />
-          <ListCard title="Hipoteses para testar" items={result.posicionamentoUnidade.hipotesesParaTestar.slice(0, 3)} />
+          <ListCard title="Diferenciais a reforçar" items={result.posicionamentoUnidade.diferenciaisFrenteConcorrentes.slice(0, 3)} />
+          <ListCard title="Hipóteses para testar" items={result.posicionamentoUnidade.hipotesesParaTestar.slice(0, 3)} />
         </div>
         <div className="mt-5 grid gap-4">
           {result.planoDeAcao.slice(0, 3).map((item) => (
@@ -183,22 +183,22 @@ export function Dashboard({ result }: { result: AnalysisResult; readOnly?: boole
       </Card>
 
       <Card className="no-print">
-        <h2 className="text-2xl font-bold text-slate-900">Imprimir analise</h2>
-        <p className="mt-2 text-sm text-slate-500">Gere um PDF organizado pelo navegador com resumo, mapa, graficos e secoes principais.</p>
+        <h2 className="text-2xl font-bold text-slate-900">Imprimir análise</h2>
+        <p className="mt-2 text-sm text-slate-500">Gere um PDF organizado pelo navegador com resumo, mapa, gráficos e seções principais.</p>
         <button
           type="button"
           onClick={() => window.print()}
           className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600"
         >
           <Printer className="h-4 w-4" />
-          Imprimir Analise
+          Imprimir Análise
         </button>
       </Card>
 
       <Card>
         <details>
-          <summary className="cursor-pointer text-lg font-bold text-slate-900">Diagnostico das fontes publicas</summary>
-          <p className="mt-3 text-sm text-slate-500">Log tecnico para conferir chaves, cotas e retornos das APIs usadas.</p>
+          <summary className="cursor-pointer text-lg font-bold text-slate-900">Diagnóstico das fontes públicas</summary>
+          <p className="mt-3 text-sm text-slate-500">Log técnico para conferir chaves, cotas e retornos das APIs usadas.</p>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700">
             {result.diagnosticoFontesPublicas.map((item) => (
               <li key={item}>{item}</li>
