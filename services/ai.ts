@@ -2,6 +2,7 @@
 // Se nao houver OPENAI_API_KEY, a aplicacao continua funcionando com as regras locais.
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { assertMonthlyBudget } from '@/services/usage-budget';
+import type { AppLanguage } from '@/lib/i18n';
 import type { AnalysisResult } from '@/lib/types';
 
 function extractJson(text: string) {
@@ -14,7 +15,7 @@ function extractJson(text: string) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
-export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<AnalysisResult> | null> {
+export async function enhanceWithOpenAI(base: AnalysisResult, language: AppLanguage = 'pt-BR'): Promise<Partial<AnalysisResult> | null> {
   // Esta funcao pede para a IA melhorar o plano de acao e o posicionamento.
   // Se a chamada falhar, retornamos null para usar o relatorio local sem quebrar a analise.
   const apiKey = process.env.OPENAI_API_KEY;
@@ -51,10 +52,16 @@ export async function enhanceWithOpenAI(base: AnalysisResult): Promise<Partial<A
     }))
   };
 
+  const languageInstruction = language === 'en-US'
+    ? 'Generate the entire response in American English.'
+    : 'Gere toda a resposta em português brasileiro.';
+
   const prompt = `
 Você é especialista em inteligência de mercado para negócios B2B e B2C de diferentes setores.
 
-Gere uma complementação em PT-BR, sem substituir a operação atual da empresa analisada. Trabalhe com evolução incremental: manter, melhorar, adicionar, testar antes de alterar e fazer sem prejudicar a operação.
+${languageInstruction}
+
+Gere uma complementação no idioma solicitado, sem substituir a operação atual da empresa analisada. Trabalhe com evolução incremental: manter, melhorar, adicionar, testar antes de alterar e fazer sem prejudicar a operação.
 
 Para o campo "planoDeAcao", aja como consultor executivo e entregue recomendações realmente acionáveis:
 - Crie de 6 a 8 ações priorizadas.
@@ -149,7 +156,7 @@ ${JSON.stringify(payload, null, 2)}
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         temperature: 0.2,
         messages: [
-          { role: 'system', content: 'Responda apenas em JSON válido e em português brasileiro.' },
+          { role: 'system', content: language === 'en-US' ? 'Return only valid JSON in American English.' : 'Responda apenas em JSON válido e em português brasileiro.' },
           { role: 'user', content: prompt }
         ]
       })

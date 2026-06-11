@@ -9,7 +9,13 @@ import { geocodeAddress, geocodeCep } from '@/services/geocode';
 import { getStrategicPlaces } from '@/services/google-places';
 import { enhanceWithOpenAI } from '@/services/ai';
 import { DEFAULT_COMPETITOR_TYPES, type CompetitorType } from '@/lib/competitor-types';
+import { DEFAULT_LANGUAGE, type AppLanguage } from '@/lib/i18n';
+import { localizeAnalysisResult } from '@/services/localize-analysis';
 import type { AnalysisResult, BusinessModelCanvas, CepPoint, CnaeOption, NeighborhoodScore, Persona, StrategicPlace, UnidadeNegocio } from '@/lib/types';
+
+function textFor(language: AppLanguage, ptText: string, enText: string) {
+  return language === 'en-US' ? enText : ptText;
+}
 
 function median(values: number[]) {
   // Mediana e o numero que fica no meio da lista ordenada.
@@ -439,6 +445,7 @@ export async function runMarketAnalysis(input: {
   businessActivityDescription?: string;
   competitorTypes?: CompetitorType[];
   analysisRadiusKm?: number;
+  language?: AppLanguage;
 }): Promise<AnalysisResult> {
   // Esta e a funcao principal.
   // Ela valida CEPs, geocodifica enderecos, busca concorrentes, calcula rankings e salva tudo no banco.
@@ -446,14 +453,15 @@ export async function runMarketAnalysis(input: {
   const validCeps = [...new Set(rawCeps.map(normalizeCep).filter(isValidCep))];
   const invalidCeps = rawCeps.map(String).filter((cep) => cep.trim() && !isValidCep(cep));
   const analysisRadiusKm = Math.max(1, Math.min(20, Number(input.analysisRadiusKm || 4)));
+  const language = input.language || DEFAULT_LANGUAGE;
   const businessActivityDescription = String(input.businessActivityDescription || '').trim().slice(0, 300);
-  if (businessActivityDescription.length < 3) throw new Error('Descreva o ramo de atividade antes de iniciar a análise.');
+  if (businessActivityDescription.length < 3) throw new Error(textFor(language, 'Descreva o ramo de atividade antes de iniciar a análise.', 'Describe the business activity before starting the analysis.'));
   const selectedCnaes: CnaeOption[] = [];
   const competitorTypes = input.competitorTypes?.length ? input.competitorTypes : DEFAULT_COMPETITOR_TYPES;
   const domain = `Ramo informado: ${businessActivityDescription}`;
 
   const unitGeo = await resolveUnitGeo(input.unidade);
-  if (!unitGeo) throw new Error('Não foi possível localizar o endereço informado. Revise CEP, bairro, cidade e UF.');
+  if (!unitGeo) throw new Error(textFor(language, 'Não foi possível localizar o endereço informado. Revise CEP, bairro, cidade e UF.', 'Could not locate the entered address. Review ZIP/postal code, neighborhood, city, and state.'));
 
   const points: CepPoint[] = [];
   for (const cep of validCeps.slice(0, 500)) {
@@ -503,6 +511,7 @@ export async function runMarketAnalysis(input: {
 
   const result: AnalysisResult = {
     createdAt: today.toISOString(),
+    language,
     domain,
     selectedCnaes,
     businessActivityDescription: businessActivityDescription || undefined,
@@ -606,10 +615,19 @@ export async function runMarketAnalysis(input: {
     proximaRevisaoRecomendada: new Date(today.getTime() + reviewDays * 24 * 60 * 60 * 1000).toISOString(),
     iaAviso: process.env.OPENAI_API_KEY ? undefined : 'A análise com IA avançada não foi executada porque a chave OpenAI não está configurada. O relatório usa regras locais, Google Places e dados públicos disponíveis.'
   };
-  const aiEnhancement = await enhanceWithOpenAI(result);
+  const localizedResult = localizeAnalysisResult(result, language);
+  const aiEnhancement = await enhanceWithOpenAI(localizedResult, language);
   const finalResult: AnalysisResult = aiEnhancement
-    ? { ...result, ...aiEnhancement, posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || result.posicionamentoUnidade, iaAviso: 'Plano de ação e recomendações enriquecidos com IA a partir do ramo informado, dados públicos, concorrentes, CEPs de clientes quando enviados e limitações encontradas.' }
-    : result;
+    ? {
+        ...localizedResult,
+        ...aiEnhancement,
+        language,
+        posicionamentoUnidade: aiEnhancement.posicionamentoUnidade || localizedResult.posicionamentoUnidade,
+        iaAviso: language === 'en-US'
+          ? 'Action plan and recommendations were enriched with AI using the stated business activity, public data, competitors, uploaded customer ZIP/postal codes when available, and detected limitations.'
+          : 'Plano de ação e recomendações enriquecidos com IA a partir do ramo informado, dados públicos, concorrentes, CEPs de clientes quando enviados e limitações encontradas.'
+      }
+    : localizedResult;
 
   const saved = await prisma.analysis.create({
     data: {

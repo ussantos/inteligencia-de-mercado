@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AnalysisResult, StrategicPlace } from '@/lib/types';
 import { formatCep, formatKm } from '@/lib/utils';
+import { DEFAULT_LANGUAGE, categoryLabel, type AppLanguage } from '@/lib/i18n';
 
 type GoogleWindow = Window & {
   google?: any;
@@ -37,13 +38,18 @@ function isValidCoord(lat: unknown, lng: unknown) {
   return typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng);
 }
 
-function loadGoogleMaps(apiKey: string) {
+function tr(language: AppLanguage, ptText: string, enText: string) {
+  return language === 'en-US' ? enText : ptText;
+}
+
+function loadGoogleMaps(apiKey: string, language: AppLanguage) {
   const googleWindow = getGoogleWindow();
   if (googleWindow.google?.maps) return Promise.resolve();
   if (!googleWindow.__googleMapsPromise) {
     googleWindow.__googleMapsPromise = new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&language=pt-BR&region=BR`;
+      const mapsLanguage = language === 'en-US' ? 'en' : 'pt-BR';
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&language=${mapsLanguage}&region=${language === 'en-US' ? 'US' : 'BR'}`;
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
@@ -83,7 +89,8 @@ function clearOverlays(overlays: Array<{ setMap: (map: any) => void }>) {
   overlays.forEach((overlay) => overlay.setMap(null));
 }
 
-export function MarketMap({ result }: { result: AnalysisResult }) {
+export function MarketMap({ result, language: languageProp }: { result: AnalysisResult; language?: AppLanguage }) {
+  const language = languageProp || result.language || DEFAULT_LANGUAGE;
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY;
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -105,7 +112,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
   useEffect(() => {
     if (!apiKey || !center || !mapElementRef.current) {
       setStatus('error');
-      setErrorMessage('Configure NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY para exibir o Google Maps no navegador.');
+      setErrorMessage(tr(language, 'Configure NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY para exibir o Google Maps no navegador.', 'Configure NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY to display Google Maps in the browser.'));
       return;
     }
 
@@ -113,7 +120,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
     setStatus('loading');
     setErrorMessage('');
 
-    loadGoogleMaps(apiKey)
+    loadGoogleMaps(apiKey, language)
       .then(() => {
         if (cancelled || !mapElementRef.current) return;
         const google = getGoogleWindow().google;
@@ -135,7 +142,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       .catch(() => {
         if (!cancelled) {
           setStatus('error');
-          setErrorMessage('Não foi possível carregar o Google Maps. Verifique a chave pública, a Maps JavaScript API e as restrições de HTTP referrer.');
+          setErrorMessage(tr(language, 'Não foi possível carregar o Google Maps. Verifique a chave pública, a Maps JavaScript API e as restrições de HTTP referrer.', 'Could not load Google Maps. Check the public key, Maps JavaScript API, and HTTP referrer restrictions.'));
         }
       });
 
@@ -145,7 +152,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       overlaysRef.current = [];
       mapRef.current = null;
     };
-  }, [apiKey, center]);
+  }, [apiKey, center, language]);
 
   useEffect(() => {
     const google = getGoogleWindow().google;
@@ -164,13 +171,13 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       const marker = new google.maps.Marker({
         map,
         position: center,
-        title: 'Sua empresa',
+        title: tr(language, 'Sua empresa', 'Your company'),
         label: { text: 'E', color: '#ffffff', fontWeight: '700' },
         icon: markerSymbol(google, '#2563eb', 11)
       });
       marker.addListener('click', () => {
         infoWindow.setContent(
-          `<strong>Sua empresa</strong><br>${escapeHtml(result.unidade.nomeFantasia || result.unidade.razaoSocial)}<br>${escapeHtml(result.unidadeGeo.endereco)}`
+          `<strong>${escapeHtml(tr(language, 'Sua empresa', 'Your company'))}</strong><br>${escapeHtml(result.unidade.nomeFantasia || result.unidade.razaoSocial)}<br>${escapeHtml(result.unidadeGeo.endereco)}`
         );
         infoWindow.open(map, marker);
       });
@@ -190,7 +197,7 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
         });
         marker.addListener('click', () => {
           infoWindow.setContent(
-            `<strong>CEP ${escapeHtml(formatCep(point.cep))}</strong><br>${escapeHtml(point.bairro)}, ${escapeHtml(point.cidade)}/${escapeHtml(point.uf)}<br>Distancia: ${escapeHtml(formatKm(point.distanciaLinhaRetaKm))}`
+            `<strong>${escapeHtml(tr(language, 'CEP', 'ZIP'))} ${escapeHtml(formatCep(point.cep))}</strong><br>${escapeHtml(point.bairro)}, ${escapeHtml(point.cidade)}/${escapeHtml(point.uf)}<br>${escapeHtml(tr(language, 'Distância', 'Distance'))}: ${escapeHtml(formatKm(point.distanciaLinhaRetaKm))}`
           );
           infoWindow.open(map, marker);
         });
@@ -212,10 +219,10 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
           icon: markerSymbol(google, color, place.categoriaEstrategica.toLowerCase().includes('barreira') ? 9 : 7)
         });
         marker.addListener('click', () => {
-          const rating = place.rating ? `<br>Avaliação: ${escapeHtml(place.rating.toFixed(1))} (${escapeHtml(place.userRatingCount || 0)} avaliações)` : '';
-          const website = place.website ? `<br><a href="${escapeHtml(place.website)}" target="_blank" rel="noreferrer">Site do local</a>` : '';
+          const rating = place.rating ? `<br>${escapeHtml(tr(language, 'Avaliação', 'Rating'))}: ${escapeHtml(place.rating.toFixed(1))} (${escapeHtml(place.userRatingCount || 0)} ${escapeHtml(tr(language, 'avaliações', 'reviews'))})` : '';
+          const website = place.website ? `<br><a href="${escapeHtml(place.website)}" target="_blank" rel="noreferrer">${escapeHtml(tr(language, 'Site do local', 'Place website'))}</a>` : '';
           infoWindow.setContent(
-            `<strong>${escapeHtml(place.nome)}</strong><br>${escapeHtml(place.categoriaEstrategica)}<br>${escapeHtml(place.subcategoria)}${rating}<br>Distancia: ${escapeHtml(formatKm(place.distanciaKm))}<br>Fonte: ${escapeHtml(place.fonte)}<br>${escapeHtml(place.observacaoEstrategica)}${website}`
+            `<strong>${escapeHtml(place.nome)}</strong><br>${escapeHtml(categoryLabel(language, place.categoriaEstrategica))}<br>${escapeHtml(place.subcategoria)}${rating}<br>${escapeHtml(tr(language, 'Distância', 'Distance'))}: ${escapeHtml(formatKm(place.distanciaKm))}<br>${escapeHtml(tr(language, 'Fonte', 'Source'))}: ${escapeHtml(place.fonte)}<br>${escapeHtml(place.observacaoEstrategica)}${website}`
           );
           infoWindow.open(map, marker);
         });
@@ -229,12 +236,12 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
       map.setCenter(center);
       map.setZoom(12);
     }
-  }, [center, result.unidade.nomeFantasia, result.unidade.razaoSocial, result.unidadeGeo.endereco, showCompany, showCustomers, showPlaces, status, validPlaces, validPoints]);
+  }, [center, language, result.unidade.nomeFantasia, result.unidade.razaoSocial, result.unidadeGeo.endereco, showCompany, showCustomers, showPlaces, status, validPlaces, validPoints]);
 
   if (!center) {
     return (
       <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed bg-slate-50 p-6 text-center text-sm text-slate-500">
-        Não foi possível desenhar o mapa porque a coordenada da empresa não foi encontrada.
+        {tr(language, 'Não foi possível desenhar o mapa porque a coordenada da empresa não foi encontrada.', 'The map could not be drawn because the company coordinate was not found.')}
       </div>
     );
   }
@@ -242,26 +249,26 @@ export function MarketMap({ result }: { result: AnalysisResult }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 text-sm">
-        <LayerToggle checked={showCompany} color="#2563eb" label="Empresa" onChange={setShowCompany} />
-        <LayerToggle checked={showCustomers} color="#2563eb" label="CEPs/clientes" onChange={setShowCustomers} />
-        <LayerToggle checked={showPlaces} color="#0f172a" label="Concorrentes e locais" onChange={setShowPlaces} />
+        <LayerToggle checked={showCompany} color="#2563eb" label={tr(language, 'Empresa', 'Company')} onChange={setShowCompany} />
+        <LayerToggle checked={showCustomers} color="#2563eb" label={tr(language, 'CEPs/clientes', 'ZIPs/customers')} onChange={setShowCustomers} />
+        <LayerToggle checked={showPlaces} color="#0f172a" label={tr(language, 'Concorrentes e locais', 'Competitors and places')} onChange={setShowPlaces} />
       </div>
 
       <div className="relative overflow-hidden rounded-2xl border border-slate-200">
         <div ref={mapElementRef} className="google-map-canvas" />
         {status !== 'ready' && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-50/90 p-6 text-center text-sm text-slate-600">
-            {status === 'loading' ? 'Carregando Google Maps...' : errorMessage}
+            {status === 'loading' ? tr(language, 'Carregando Google Maps...', 'Loading Google Maps...') : errorMessage}
           </div>
         )}
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-        <LegendDot color="#0f172a" label="Concorrente direto" />
-        <LegendDot color="#475569" label="Concorrente indireto" />
-        <LegendDot color="#f97316" label="Barreira" />
-        <LegendDot color="#7c3aed" label="Polo de público" />
-        <LegendDot color="#16a34a" label="Parceria" />
+        <LegendDot color="#0f172a" label={tr(language, 'Concorrente direto', 'Direct competitor')} />
+        <LegendDot color="#475569" label={tr(language, 'Concorrente indireto', 'Indirect competitor')} />
+        <LegendDot color="#f97316" label={tr(language, 'Barreira', 'Barrier')} />
+        <LegendDot color="#7c3aed" label={tr(language, 'Polo de público', 'Traffic generator')} />
+        <LegendDot color="#16a34a" label={tr(language, 'Parceria', 'Partnership')} />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import type { AnalysisResult } from '@/lib/types';
 import type { BusinessModelCanvas } from '@/lib/types';
 import type { ReactNode } from 'react';
 import { formatKm } from '@/lib/utils';
+import { DEFAULT_LANGUAGE, categoryLabel, competitorLabel, phaseLabel, simpleLabel, type AppLanguage } from '@/lib/i18n';
 
 const PRINT_CHART_COLORS = ['#2563eb', '#16a34a', '#f97316', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#be185d'];
 const PRINT_CANVAS_BLOCKS: Array<{ key: keyof BusinessModelCanvas; title: string }> = [
@@ -23,9 +24,30 @@ const PRINT_MAP_WIDTH = 1024;
 const PRINT_MAP_HEIGHT = 512;
 const PRINT_MAP_TILE_SIZE = 256;
 
-function starLabel(rating?: number | null, count?: number | null) {
-  if (!rating) return 'Sem avaliação Google';
-  return `${rating.toFixed(1)} (${count || 0} avaliações)`;
+function tr(language: AppLanguage, ptText: string, enText: string) {
+  return language === 'en-US' ? enText : ptText;
+}
+
+function printCanvasBlocks(language: AppLanguage): Array<{ key: keyof BusinessModelCanvas; title: string }> {
+  return PRINT_CANVAS_BLOCKS.map((block) => ({
+    ...block,
+    title: tr(language, block.title, {
+      'Proposta de valor': 'Value proposition',
+      'Segmentos de clientes': 'Customer segments',
+      Canais: 'Channels',
+      Relacionamento: 'Customer relationship',
+      'Fontes de receita': 'Revenue streams',
+      'Recursos-chave': 'Key resources',
+      'Atividades-chave': 'Key activities',
+      'Parcerias-chave': 'Key partnerships',
+      'Estrutura de custos': 'Cost structure'
+    }[block.title] || block.title)
+  }));
+}
+
+function starLabel(language: AppLanguage, rating?: number | null, count?: number | null) {
+  if (!rating) return tr(language, 'Sem avaliação Google', 'No Google rating');
+  return `${rating.toFixed(1)} (${count || 0} ${tr(language, 'avaliações', 'reviews')})`;
 }
 
 function valueOrDash(value: unknown) {
@@ -155,11 +177,11 @@ function PrintPage({ children, className = '' }: { children: ReactNode; classNam
   return <article className={`print-page ${className}`}>{children}</article>;
 }
 
-function PrintGeoMap({ result }: { result: AnalysisResult }) {
+function PrintGeoMap({ result, language }: { result: AnalysisResult; language: AppLanguage }) {
   const tiles = buildPrintMapTiles(result);
   const points = buildPrintMapPoints(result);
   return (
-    <PrintBlock title="Mapa da região analisada">
+    <PrintBlock title={tr(language, 'Mapa da região analisada', 'Analyzed region map')}>
       <div className="print-map">
         {tiles.map((tile) => (
           <img
@@ -180,13 +202,13 @@ function PrintGeoMap({ result }: { result: AnalysisResult }) {
         ))}
       </div>
       <div className="print-map-legend">
-        <span><i style={{ backgroundColor: '#2563eb' }} /> Empresa</span>
-        <span><i style={{ backgroundColor: '#38bdf8' }} /> CEPs/clientes</span>
-        <span><i style={{ backgroundColor: '#0f172a' }} /> Concorrentes</span>
-        <span><i style={{ backgroundColor: '#f97316' }} /> Barreiras</span>
-        <span><i style={{ backgroundColor: '#16a34a' }} /> Parcerias</span>
+        <span><i style={{ backgroundColor: '#2563eb' }} /> {tr(language, 'Empresa', 'Company')}</span>
+        <span><i style={{ backgroundColor: '#38bdf8' }} /> {tr(language, 'CEPs/clientes', 'ZIPs/customers')}</span>
+        <span><i style={{ backgroundColor: '#0f172a' }} /> {tr(language, 'Concorrentes', 'Competitors')}</span>
+        <span><i style={{ backgroundColor: '#f97316' }} /> {tr(language, 'Barreiras', 'Barriers')}</span>
+        <span><i style={{ backgroundColor: '#16a34a' }} /> {tr(language, 'Parcerias', 'Partnerships')}</span>
       </div>
-      <p className="print-caption">Mapa OpenStreetMap usado apenas na impressão, com marcadores calculados a partir das coordenadas da análise. O mapa interativo completo fica disponível na tela.</p>
+      <p className="print-caption">{tr(language, 'Mapa OpenStreetMap usado apenas na impressão, com marcadores calculados a partir das coordenadas da análise. O mapa interativo completo fica disponível na tela.', 'OpenStreetMap is used only for printing, with markers calculated from the analysis coordinates. The full interactive map remains available on screen.')}</p>
     </PrintBlock>
   );
 }
@@ -210,14 +232,14 @@ function PrintBarChart({ title, rows }: { title: string; rows: Array<{ label: st
   );
 }
 
-function PrintCategoryChart({ result }: { result: AnalysisResult }) {
+function PrintCategoryChart({ result, language }: { result: AnalysisResult; language: AppLanguage }) {
   const counts = new Map<string, number>();
   result.strategicPlaces.forEach((place) => {
-    const key = place.categoriaEstrategica || 'Outros';
+    const key = categoryLabel(language, place.categoriaEstrategica || 'Outros');
     counts.set(key, (counts.get(key) || 0) + 1);
   });
   const rows = [...counts.entries()].map(([label, value], index) => ({ label, value, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] })).slice(0, 8);
-  return <PrintBarChart title="Locais por categoria estratégica" rows={rows.length ? rows : [{ label: 'Sem locais mapeados', value: 0 }]} />;
+  return <PrintBarChart title={tr(language, 'Locais por categoria estratégica', 'Places by strategic category')} rows={rows.length ? rows : [{ label: tr(language, 'Sem locais mapeados', 'No mapped places'), value: 0 }]} />;
 }
 
 function normalizePrintBusinessModelCanvas(result: AnalysisResult): BusinessModelCanvas {
@@ -246,7 +268,8 @@ function normalizePrintBusinessModelCanvas(result: AnalysisResult): BusinessMode
   }, {} as BusinessModelCanvas);
 }
 
-export function PrintableReport({ result }: { result: AnalysisResult }) {
+export function PrintableReport({ result, language: languageProp }: { result: AnalysisResult; language?: AppLanguage }) {
+  const language = languageProp || result.language || DEFAULT_LANGUAGE;
   const unitName = result.unidade.nomeFantasia || result.unidade.razaoSocial;
   const hasCustomerCepData = result.points.length > 0;
   const direct = result.strategicPlaces.filter((place) => place.categoriaEstrategica.toLowerCase().includes('concorrente direto')).length;
@@ -266,92 +289,93 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
   const topEconomic = result.perfilEconomico.slice(0, 6);
   const distanceRows = result.estatisticas.distribuicaoDistancias.map((item, index) => ({ label: item.faixa, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
   const neighborhoodRows = result.estatisticas.topBairros.slice(0, 8).map((item, index) => ({ label: `${item.bairro}, ${item.cidade}`, value: item.total, color: PRINT_CHART_COLORS[index % PRINT_CHART_COLORS.length] }));
-  const scopeLabel = result.businessActivityDescription ? `Ramo informado: ${result.businessActivityDescription}` : 'Ramo não informado no relatório antigo';
+  const scopeLabel = result.businessActivityDescription ? tr(language, `Ramo informado: ${result.businessActivityDescription}`, `Stated activity: ${result.businessActivityDescription}`) : tr(language, 'Ramo não informado no relatório antigo', 'Activity not provided in this older report');
+  const canvasBlocks = printCanvasBlocks(language);
 
   return (
     <div id="analysis-report" className="print-report">
       <PrintPage className="print-cover">
         <header className="print-header">
           <div>
-            <p className="print-kicker">Inteligência de Mercado</p>
-            <h1>Análise regional de concorrência</h1>
+            <p className="print-kicker">{tr(language, 'Inteligência de Mercado', 'Market Intelligence')}</p>
+            <h1>{tr(language, 'Análise regional de concorrência', 'Regional competitive analysis')}</h1>
             <p>{unitName}</p>
           </div>
           <div className="print-date">
             <strong>{new Date(result.createdAt).toLocaleDateString('pt-BR')}</strong>
-            <span>Raio: {result.analysisRadiusKm} km</span>
+            <span>{tr(language, 'Raio:', 'Radius:')} {result.analysisRadiusKm} km</span>
           </div>
         </header>
 
         <div className="print-summary">
-          <span>{result.faseMercadoLocal.fase}</span>
+          <span>{phaseLabel(language, result.faseMercadoLocal.fase)}</span>
           <p>{result.faseMercadoLocal.justificativa}</p>
         </div>
 
         <div className="print-metrics-grid">
-          <PrintMetric label="CEPs válidos" value={result.estatisticas.totalValidos} />
-          <PrintMetric label="Bairros de clientes" value={hasCustomerCepData ? result.estatisticas.topBairros.length : 'Sem planilha'} />
-          <PrintMetric label="Concorrentes diretos" value={direct} />
-          <PrintMetric label="Concorrentes indiretos" value={indirect} />
-          <PrintMetric label="Oportunidade" value={`${result.estatisticas.indiceOportunidadeMercado}/100`} />
-          <PrintMetric label="Distância média" value={result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMediaKm) : 'Sem planilha'} />
+          <PrintMetric label={tr(language, 'CEPs válidos', 'Valid ZIPs')} value={result.estatisticas.totalValidos} />
+          <PrintMetric label={tr(language, 'Bairros de clientes', 'Customer neighborhoods')} value={hasCustomerCepData ? result.estatisticas.topBairros.length : tr(language, 'Sem planilha', 'No spreadsheet')} />
+          <PrintMetric label={tr(language, 'Concorrentes diretos', 'Direct competitors')} value={direct} />
+          <PrintMetric label={tr(language, 'Concorrentes indiretos', 'Indirect competitors')} value={indirect} />
+          <PrintMetric label={tr(language, 'Oportunidade', 'Opportunity')} value={`${result.estatisticas.indiceOportunidadeMercado}/100`} />
+          <PrintMetric label={tr(language, 'Distância média', 'Average distance')} value={result.estatisticas.totalValidos ? formatKm(result.estatisticas.distanciaMediaKm) : tr(language, 'Sem planilha', 'No spreadsheet')} />
         </div>
 
         <div className="print-two-columns">
-          <PrintBlock title="Empresa analisada">
-            <p><strong>Razão social:</strong> {result.unidade.razaoSocial}</p>
+          <PrintBlock title={tr(language, 'Empresa analisada', 'Analyzed company')}>
+            <p><strong>{tr(language, 'Razão social:', 'Legal name:')}</strong> {result.unidade.razaoSocial}</p>
             {result.unidade.cnpj && <p><strong>CNPJ:</strong> {result.unidade.cnpj}</p>}
-            <p><strong>Endereço:</strong> {result.unidade.logradouro}, {result.unidade.numero} - {result.unidade.bairro}, {result.unidade.municipio}/{result.unidade.uf}</p>
+            <p><strong>{tr(language, 'Endereço:', 'Address:')}</strong> {result.unidade.logradouro}, {result.unidade.numero} - {result.unidade.bairro}, {result.unidade.municipio}/{result.unidade.uf}</p>
           </PrintBlock>
-          <PrintBlock title="Escopo da análise">
-            <p><strong>Escopo usado:</strong> {scopeLabel}</p>
-            <p><strong>Tipos de concorrentes:</strong> {result.competitorTypes.join(', ')}</p>
-            <p>{hasCustomerCepData ? 'Os bairros de clientes deste relatório vêm da planilha de CEPs enviada.' : 'Nenhuma planilha de CEPs foi enviada; o relatório não infere bairros de clientes a partir de concorrentes.'}</p>
+          <PrintBlock title={tr(language, 'Escopo da análise', 'Analysis scope')}>
+            <p><strong>{tr(language, 'Escopo usado:', 'Scope used:')}</strong> {scopeLabel}</p>
+            <p><strong>{tr(language, 'Tipos de concorrentes:', 'Competitor types:')}</strong> {result.competitorTypes.map((type) => competitorLabel(language, type)).join(', ')}</p>
+            <p>{tr(language, hasCustomerCepData ? 'Os bairros de clientes deste relatório vêm da planilha de CEPs enviada.' : 'Nenhuma planilha de CEPs foi enviada; o relatório não infere bairros de clientes a partir de concorrentes.', hasCustomerCepData ? 'Customer neighborhoods in this report come from the uploaded ZIP/postal-code spreadsheet.' : 'No ZIP/postal-code spreadsheet was uploaded; the report does not infer customer neighborhoods from competitors.')}</p>
           </PrintBlock>
         </div>
       </PrintPage>
 
       <PrintPage>
-        <h2>Mapa e gráficos da análise</h2>
-        <PrintGeoMap result={result} />
+        <h2>{tr(language, 'Mapa e gráficos da análise', 'Analysis map and charts')}</h2>
+        <PrintGeoMap result={result} language={language} />
         {hasCustomerCepData && (
           <div className="print-two-columns">
-            <PrintBarChart title="CEPs por faixa de distância" rows={distanceRows.length ? distanceRows : [{ label: 'Sem planilha', value: 0 }]} />
-            <PrintBarChart title="Bairros com mais CEPs enviados" rows={neighborhoodRows.length ? neighborhoodRows : [{ label: 'Sem bairros', value: 0 }]} />
+            <PrintBarChart title={tr(language, 'CEPs por faixa de distância', 'ZIPs by distance range')} rows={distanceRows.length ? distanceRows : [{ label: tr(language, 'Sem planilha', 'No spreadsheet'), value: 0 }]} />
+            <PrintBarChart title={tr(language, 'Bairros com mais CEPs enviados', 'Neighborhoods with most uploaded ZIPs')} rows={neighborhoodRows.length ? neighborhoodRows : [{ label: tr(language, 'Sem bairros', 'No neighborhoods'), value: 0 }]} />
           </div>
         )}
-        <PrintCategoryChart result={result} />
+        <PrintCategoryChart result={result} language={language} />
       </PrintPage>
 
       <PrintPage>
-        <h2>Recomendações e estatísticas</h2>
+        <h2>{tr(language, 'Recomendações e estatísticas', 'Recommendations and statistics')}</h2>
         <div className="print-two-columns">
-          <PrintBlock title="Prioridade principal">
+          <PrintBlock title={tr(language, 'Prioridade principal', 'Main priority')}>
             <p>{recommendations.prioridadePrincipal}</p>
           </PrintBlock>
-          <PrintBlock title="Brecha competitiva">
+          <PrintBlock title={tr(language, 'Brecha competitiva', 'Competitive gap')}>
             <p>{recommendations.brechaCompetitiva}</p>
           </PrintBlock>
-          <PrintBlock title="Persona foco">
+          <PrintBlock title={tr(language, 'Persona foco', 'Focus persona')}>
             <p>{recommendations.personaFoco}</p>
           </PrintBlock>
-          <PrintBlock title="Objecao e resposta">
-            <p><strong>Objecao provavel:</strong> {recommendations.objecaoProvavel}</p>
-            <p><strong>Resposta:</strong> {recommendations.respostaRecomendada}</p>
+          <PrintBlock title={tr(language, 'Objeção e resposta', 'Objection and response')}>
+            <p><strong>{tr(language, 'Objeção provável:', 'Likely objection:')}</strong> {recommendations.objecaoProvavel}</p>
+            <p><strong>{tr(language, 'Resposta:', 'Response:')}</strong> {recommendations.respostaRecomendada}</p>
           </PrintBlock>
         </div>
-        <PrintBlock title="Mensagem pronta">
+        <PrintBlock title={tr(language, 'Mensagem pronta', 'Ready-to-use message')}>
           <p>{recommendations.mensagemPronta}</p>
         </PrintBlock>
 
         <div className="print-two-columns">
           {hasCustomerCepData && (
-            <PrintBlock title="Resumo de distância dos clientes">
-              <p><strong>Distância média:</strong> {formatKm(result.estatisticas.distanciaMediaKm)}</p>
-              <p><strong>Distância mediana:</strong> {formatKm(result.estatisticas.distanciaMedianaKm)}</p>
+            <PrintBlock title={tr(language, 'Resumo de distância dos clientes', 'Customer distance summary')}>
+              <p><strong>{tr(language, 'Distância média:', 'Average distance:')}</strong> {formatKm(result.estatisticas.distanciaMediaKm)}</p>
+              <p><strong>{tr(language, 'Distância mediana:', 'Median distance:')}</strong> {formatKm(result.estatisticas.distanciaMedianaKm)}</p>
             </PrintBlock>
           )}
-          <PrintBlock title="Índice de oportunidade">
+          <PrintBlock title={tr(language, 'Índice de oportunidade', 'Opportunity index')}>
             <p>{result.estatisticas.indiceOportunidadeMercado}/100</p>
           </PrintBlock>
         </div>
@@ -359,10 +383,10 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
 
       {hasCustomerCepData && (
         <PrintPage>
-          <h2>Bairros de clientes e oportunidades</h2>
-          <p className="print-page-intro">Esta página usa somente os CEPs de clientes enviados pelo usuário. Ela não usa concorrentes como se fossem clientes.</p>
+          <h2>{tr(language, 'Bairros de clientes e oportunidades', 'Customer neighborhoods and opportunities')}</h2>
+          <p className="print-page-intro">{tr(language, 'Esta página usa somente os CEPs de clientes enviados pelo usuário. Ela não usa concorrentes como se fossem clientes.', 'This page uses only customer ZIP/postal codes uploaded by the user. It does not treat competitors as customers.')}</p>
           <div className="print-two-columns">
-            <PrintBlock title="Indice de afinidade por bairro de cliente">
+            <PrintBlock title={tr(language, 'Índice de afinidade por bairro de cliente', 'Customer-neighborhood affinity index')}>
               {topAffinity.map((item, index) => (
                 <div key={`${item.bairro}-${item.cidade}`} className="print-ranking-item">
                   <strong>{index + 1}. {item.bairro}, {item.cidade} - {item.score}/100</strong>
@@ -370,7 +394,7 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
                 </div>
               ))}
             </PrintBlock>
-            <PrintBlock title="Leitura operacional dos bairros com clientes">
+            <PrintBlock title={tr(language, 'Leitura operacional dos bairros com clientes', 'Operational reading of customer neighborhoods')}>
               {topEconomic.map((item, index) => (
                 <div key={`${item.bairro}-${item.cidade}`} className="print-ranking-item">
                   <strong>{index + 1}. {item.bairro}, {item.cidade} - {item.score}/100</strong>
@@ -383,71 +407,71 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       )}
 
       <PrintPage>
-        <h2>Concorrentes, barreiras e posicionamento</h2>
-        <PrintBlock title="Concorrentes e locais relevantes">
+        <h2>{tr(language, 'Concorrentes, barreiras e posicionamento', 'Competitors, barriers, and positioning')}</h2>
+        <PrintBlock title={tr(language, 'Concorrentes e locais relevantes', 'Competitors and relevant places')}>
           {topPlaces.length ? (
             <table className="print-table print-places-table">
               <thead>
                 <tr>
-                  <th>Local</th>
-                  <th>Categoria</th>
-                  <th>Distância</th>
-                  <th>Avaliação</th>
+                  <th>{tr(language, 'Local', 'Place')}</th>
+                  <th>{tr(language, 'Categoria', 'Category')}</th>
+                  <th>{tr(language, 'Distância', 'Distance')}</th>
+                  <th>{tr(language, 'Avaliação', 'Rating')}</th>
                 </tr>
               </thead>
               <tbody>
                 {topPlaces.map((place) => (
                   <tr key={`${place.nome}-${place.lat}-${place.lng}`}>
                     <td>{place.nome}</td>
-                    <td>{place.categoriaEstrategica}</td>
+                    <td>{categoryLabel(language, place.categoriaEstrategica)}</td>
                     <td>{place.distanciaKm ? formatKm(place.distanciaKm) : '-'}</td>
-                    <td>{starLabel(place.rating, place.userRatingCount)}</td>
+                    <td>{starLabel(language, place.rating, place.userRatingCount)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p>Nenhum concorrente ou local relevante foi encontrado. Consulte o diagnóstico das fontes no fim do relatório.</p>
+            <p>{tr(language, 'Nenhum concorrente ou local relevante foi encontrado. Consulte o diagnóstico das fontes no fim do relatório.', 'No competitor or relevant place was found. See the source diagnosis at the end of the report.')}</p>
           )}
         </PrintBlock>
 
-        <PrintBlock title="Obstáculos de conversão">
+        <PrintBlock title={tr(language, 'Obstáculos de conversão', 'Conversion obstacles')}>
           {result.obstaculosMatricula.length ? (
             result.obstaculosMatricula.slice(0, 6).map((item) => (
               <div key={`${item.bairro}-${item.tipoObstaculo}`} className="print-ranking-item">
                 <strong>{item.bairro} - {item.tipoObstaculo} ({item.impactoEstimado})</strong>
                 <p>{item.descricao}</p>
-                <p><strong>Ação:</strong> {item.acaoRecomendada}</p>
+                <p><strong>{tr(language, 'Ação:', 'Action:')}</strong> {item.acaoRecomendada}</p>
               </div>
             ))
           ) : (
-            <p>Nenhum obstáculo relevante foi identificado.</p>
+            <p>{tr(language, 'Nenhum obstáculo relevante foi identificado.', 'No relevant obstacle was identified.')}</p>
           )}
         </PrintBlock>
       </PrintPage>
 
       <PrintPage>
-        <h2>SWOT e plano de ação</h2>
+        <h2>{tr(language, 'SWOT e plano de ação', 'SWOT and action plan')}</h2>
         <div className="print-swot">
-          <PrintBlock title="Forças">
+          <PrintBlock title={tr(language, 'Forças', 'Strengths')}>
             <PrintList items={position.forcasAtuais} limit={4} />
           </PrintBlock>
-          <PrintBlock title="Fraquezas">
+          <PrintBlock title={tr(language, 'Fraquezas', 'Weaknesses')}>
             <PrintList items={position.riscosDePosicionamento} limit={4} />
           </PrintBlock>
-          <PrintBlock title="Oportunidades">
+          <PrintBlock title={tr(language, 'Oportunidades', 'Opportunities')}>
             <PrintList items={[...position.diferenciaisFrenteConcorrentes, ...position.ajustesIncrementaisSugeridos, ...position.hipotesesParaTestar]} limit={4} />
           </PrintBlock>
-          <PrintBlock title="Ameaças">
+          <PrintBlock title={tr(language, 'Ameaças', 'Threats')}>
             <PrintList items={result.obstaculosMatricula.map((item) => `${item.tipoObstaculo} em ${item.bairro}: ${item.acaoRecomendada}`)} limit={4} />
           </PrintBlock>
         </div>
 
-        <PrintBlock title="Plano de ação">
+        <PrintBlock title={tr(language, 'Plano de ação', 'Action plan')}>
           {result.planoDeAcao.slice(0, 6).map((item) => (
             <div key={item.prioridade} className="print-action-item">
               <strong>{item.prioridade}. {item.acao}</strong>
-              <p>{item.tipo} | Impacto {item.impactoEsperado} | Execução {item.facilidadeExecucao} | Prazo {item.prazoSugerido}</p>
+              <p>{simpleLabel(language, item.tipo)} | {tr(language, 'Impacto', 'Impact')} {simpleLabel(language, item.impactoEsperado)} | {tr(language, 'Execução', 'Execution')} {simpleLabel(language, item.facilidadeExecucao)} | {tr(language, 'Prazo', 'Timeline')} {item.prazoSugerido}</p>
               <p><strong>KPI:</strong> {item.kpiParaMedirSucesso}</p>
             </div>
           ))}
@@ -455,10 +479,10 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       </PrintPage>
 
       <PrintPage>
-        <h2>Canvas do modelo de negócio</h2>
-        <p className="print-page-intro">Síntese aplicada do modelo de negócio sugerido pela análise, considerando escopo informado, região, concorrentes, canais e possíveis parcerias.</p>
+        <h2>{tr(language, 'Canvas do modelo de negócio', 'Business model canvas')}</h2>
+        <p className="print-page-intro">{tr(language, 'Síntese aplicada do modelo de negócio sugerido pela análise, considerando escopo informado, região, concorrentes, canais e possíveis parcerias.', 'Applied summary of the business model suggested by the analysis, considering the stated scope, region, competitors, channels, and possible partnerships.')}</p>
         <div className="print-canvas-grid">
-          {PRINT_CANVAS_BLOCKS.map((block) => (
+          {canvasBlocks.map((block) => (
             <PrintBlock key={block.key} title={block.title}>
               <PrintList items={businessModelCanvas[block.key]} limit={4} />
             </PrintBlock>
@@ -467,9 +491,9 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
       </PrintPage>
 
       <PrintPage>
-        <h2>Personas, evolução e fontes</h2>
+        <h2>{tr(language, 'Personas, evolução e fontes', 'Personas, evolution, and sources')}</h2>
         <div className="print-two-columns">
-          <PrintBlock title="Personas principais">
+          <PrintBlock title={tr(language, 'Personas principais', 'Main personas')}>
             {result.personas.slice(0, 4).map((persona) => (
               <div key={persona.nomeFicticio} className="print-ranking-item">
                 <strong>{persona.nomeFicticio}</strong>
@@ -478,16 +502,16 @@ export function PrintableReport({ result }: { result: AnalysisResult }) {
               </div>
             ))}
           </PrintBlock>
-          <PrintBlock title="Evolução incremental">
-            <p><strong>Manter:</strong></p>
+          <PrintBlock title={tr(language, 'Evolução incremental', 'Incremental evolution')}>
+            <p><strong>{tr(language, 'Manter:', 'Keep:')}</strong></p>
             <PrintList items={result.evolucaoIncremental.manter} limit={3} />
-            <p><strong>Melhorar:</strong></p>
+            <p><strong>{tr(language, 'Melhorar:', 'Improve:')}</strong></p>
             <PrintList items={result.evolucaoIncremental.melhorar} limit={3} />
-            <p><strong>Adicionar:</strong></p>
+            <p><strong>{tr(language, 'Adicionar:', 'Add:')}</strong></p>
             <PrintList items={result.evolucaoIncremental.adicionar} limit={3} />
           </PrintBlock>
         </div>
-        <PrintBlock title="Diagnóstico das fontes públicas">
+        <PrintBlock title={tr(language, 'Diagnóstico das fontes públicas', 'Public source diagnosis')}>
           <ul className="print-diagnostics">
             {result.diagnosticoFontesPublicas.slice(0, 12).map((item) => (
               <li key={item}>{item}</li>

@@ -128,6 +128,7 @@ export interface BusinessModelCanvas {
 
 export interface AnalysisResult {
   id?: string;
+  language?: 'pt-BR' | 'en-US';
   createdAt: string;
   domain: DomainOption;
   selectedCnaes: CnaeOption[];
