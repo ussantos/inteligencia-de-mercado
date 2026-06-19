@@ -6,7 +6,7 @@ Aplicacao web independente e bilingue (PT-BR e ingles dos EUA) para analise regi
 
 A aplicacao esta preparada para rodar em Azure Static Web Apps, conectada a um repositorio GitHub privado ou publico configurado no ambiente de deploy.
 
-Voce pode testar a aplicacao nesta URL: https://gray-glacier-0dc52610f.7.azurestaticapps.net/
+Voce pode testar a aplicacao nesta URL: https://inteligencia.myrobotbarra.com.br/
 
 ## Carater educativo, cursos e licenca
 
@@ -539,7 +539,7 @@ Independent bilingual web application (Brazilian Portuguese and American English
 
 The application is prepared to run on Azure Static Web Apps, connected to a private or public GitHub repository configured in the deployment environment.
 
-You can test the application at: https://gray-glacier-0dc52610f.7.azurestaticapps.net/
+You can test the application at: https://inteligencia.myrobotbarra.com.br/
 
 ## Educational Purpose, Courses, and License
 

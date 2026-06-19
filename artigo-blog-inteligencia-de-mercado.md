@@ -3,7 +3,7 @@ title: "Como criamos uma ferramenta de inteligência de mercado com IA, dados p�
 description: "Um projeto aplicado inspirado nos cursos App Developer, Inteligência Artificial e My Robot Business da My Robot Barra da Tijuca."
 date: "2026-06-10"
 repository: "https://github.com/ussantos/inteligencia-de-mercado"
-demo: "https://gray-glacier-0dc52610f.7.azurestaticapps.net/"
+demo: "https://inteligencia.myrobotbarra.com.br/"
 ---
 
 # Como criamos uma ferramenta de inteligência de mercado com IA, dados públicos e desenvolvimento web
@@ -14,7 +14,7 @@ O projeto foi desenvolvido como uma demonstração prática dos conceitos trabal
 
 A aplicação está publicada em:
 
-[https://gray-glacier-0dc52610f.7.azurestaticapps.net/](https://gray-glacier-0dc52610f.7.azurestaticapps.net/)
+[https://inteligencia.myrobotbarra.com.br/](https://inteligencia.myrobotbarra.com.br/)
 
 E o código-fonte está disponível em:
 
@@ -153,7 +153,7 @@ O resultado é uma aplicação educacional, aberta para estudo, adaptação e me
 
 ## Links do projeto
 
-- Aplicação publicada: [https://gray-glacier-0dc52610f.7.azurestaticapps.net/](https://gray-glacier-0dc52610f.7.azurestaticapps.net/)
+- Aplicação publicada: [https://inteligencia.myrobotbarra.com.br/](https://inteligencia.myrobotbarra.com.br/)
 - Repositório no GitHub: [https://github.com/ussantos/inteligencia-de-mercado](https://github.com/ussantos/inteligencia-de-mercado)
 - Curso App Developer: [https://www.myrobotbarra.com.br/app-developer.html](https://www.myrobotbarra.com.br/app-developer.html)
 - Curso Inteligência Artificial: [https://www.myrobotbarra.com.br/inteligencia-artificial.html](https://www.myrobotbarra.com.br/inteligencia-artificial.html)
